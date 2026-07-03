@@ -36,8 +36,31 @@ jobs:
       - name: Generate Android project (Prebuild)
         run: npx expo prebuild -p android --no-install
 
+      - name: Setup Keystore
+        run: |
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+          # Inject release signing config into build.gradle
+          sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/' android/app/build.gradle
+          cat << 'EOF' > android/app/signing.gradle
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file('release.keystore')
+                      storePassword System.getenv('ORG_GRADLE_PROJECT_MYAPP_UPLOAD_STORE_PASSWORD')
+                      keyAlias System.getenv('ORG_GRADLE_PROJECT_MYAPP_UPLOAD_KEY_ALIAS')
+                      keyPassword System.getenv('ORG_GRADLE_PROJECT_MYAPP_UPLOAD_KEY_PASSWORD')
+                  }
+              }
+          }
+          EOF
+          echo "apply from: 'signing.gradle'" >> android/app/build.gradle
+
       - name: Build Android Release APK
         working-directory: android
+        env:
+          ORG_GRADLE_PROJECT_MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_MYAPP_UPLOAD_KEY_ALIAS: ${{ secrets.RELEASE_KEYSTORE_ALIAS }}
+          ORG_GRADLE_PROJECT_MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
         run: ./gradlew assembleRelease
 
       - name: Create GitHub Release
