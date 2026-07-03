@@ -3,23 +3,23 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { Colors } from '@/constants/Colors';
 import { getItemAsync, setItemAsync } from '@/utils/storage';
 import { apiClient, getCsrfToken } from '@/api/client';
-import { Server, Key, User, Folder } from 'lucide-react-native';
+import { Server, Key, Folder } from 'lucide-react-native';
 
 export default function SettingsScreen() {
   const [ip, setIp] = useState('');
-  const [user, setUser] = useState('');
-  const [pass, setPass] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [targetDir, setTargetDir] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     (async () => {
       const savedIp = await getItemAsync('zdt_server_ip');
-      const savedUser = await getItemAsync('zdt_user');
-      const savedPass = await getItemAsync('zdt_pass');
+      const savedApiKey = await getItemAsync('zdt_api_key');
       if (savedIp) setIp(savedIp);
-      if (savedUser) setUser(savedUser);
-      if (savedPass) setPass(savedPass);
+      else if (process.env.EXPO_PUBLIC_SERVER_IP) setIp(process.env.EXPO_PUBLIC_SERVER_IP);
+      
+      if (savedApiKey) setApiKey(savedApiKey);
+      else if (process.env.EXPO_PUBLIC_API_KEY) setApiKey(process.env.EXPO_PUBLIC_API_KEY);
       
       try {
         const res = await apiClient.get('/status');
@@ -31,8 +31,7 @@ export default function SettingsScreen() {
   const handleSave = async () => {
     setSaving(true);
     await setItemAsync('zdt_server_ip', ip);
-    await setItemAsync('zdt_user', user);
-    await setItemAsync('zdt_pass', pass);
+    await setItemAsync('zdt_api_key', apiKey);
     
     try {
       if (targetDir) {
@@ -66,25 +65,14 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.inputGroup}>
-          <User color={Colors.primary} size={20} />
-          <TextInput
-            style={styles.input}
-            placeholder="USERNAME"
-            placeholderTextColor={Colors.textMuted}
-            value={user}
-            onChangeText={setUser}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
           <Key color={Colors.primary} size={20} />
           <TextInput
             style={styles.input}
-            placeholder="PASSWORD"
+            placeholder="API KEY"
             placeholderTextColor={Colors.textMuted}
             secureTextEntry
-            value={pass}
-            onChangeText={setPass}
+            value={apiKey}
+            onChangeText={setApiKey}
           />
         </View>
 

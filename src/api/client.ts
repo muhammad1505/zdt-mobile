@@ -1,23 +1,20 @@
 import axios from 'axios';
 import { getItemAsync } from '@/utils/storage';
-import { encode } from 'base-64';
 
 export const apiClient = axios.create({
   timeout: 10000,
 });
 
 apiClient.interceptors.request.use(async (config) => {
-  const ip = await getItemAsync('zdt_server_ip');
-  const user = await getItemAsync('zdt_user');
-  const pass = await getItemAsync('zdt_pass');
+  const ip = (await getItemAsync('zdt_server_ip')) || process.env.EXPO_PUBLIC_SERVER_IP;
+  const apiKey = (await getItemAsync('zdt_api_key')) || process.env.EXPO_PUBLIC_API_KEY;
 
   if (ip) {
     config.baseURL = `http://${ip}:5000/api`;
   }
   
-  if (user && pass) {
-    const encoded = encode(`${user}:${pass}`);
-    config.headers['Authorization'] = `Basic ${encoded}`;
+  if (apiKey) {
+    config.headers['X-API-Key'] = apiKey;
   }
   
   return config;
