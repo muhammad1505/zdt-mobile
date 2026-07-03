@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Colors } from '@/constants/Colors';
-import * as SecureStore from 'expo-secure-store';
+import { getItemAsync, setItemAsync } from '@/utils/storage';
 import { Server, Key, User } from 'lucide-react-native';
 
 export default function SettingsScreen() {
@@ -12,9 +12,9 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     (async () => {
-      const savedIp = await SecureStore.getItemAsync('zdt_server_ip');
-      const savedUser = await SecureStore.getItemAsync('zdt_user');
-      const savedPass = await SecureStore.getItemAsync('zdt_pass');
+      const savedIp = await getItemAsync('zdt_server_ip');
+      const savedUser = await getItemAsync('zdt_user');
+      const savedPass = await getItemAsync('zdt_pass');
       if (savedIp) setIp(savedIp);
       if (savedUser) setUser(savedUser);
       if (savedPass) setPass(savedPass);
@@ -23,9 +23,9 @@ export default function SettingsScreen() {
 
   const handleSave = async () => {
     setSaving(true);
-    await SecureStore.setItemAsync('zdt_server_ip', ip);
-    await SecureStore.setItemAsync('zdt_user', user);
-    await SecureStore.setItemAsync('zdt_pass', pass);
+    await setItemAsync('zdt_server_ip', ip);
+    await setItemAsync('zdt_user', user);
+    await setItemAsync('zdt_pass', pass);
     setTimeout(() => {
       setSaving(false);
       alert('Koneksi Server Disimpan!');

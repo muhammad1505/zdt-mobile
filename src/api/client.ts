@@ -1,14 +1,14 @@
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import { getItemAsync } from '@/utils/storage';
 
 export const apiClient = axios.create({
   timeout: 10000,
 });
 
 apiClient.interceptors.request.use(async (config) => {
-  const ip = await SecureStore.getItemAsync('zdt_server_ip');
-  const user = await SecureStore.getItemAsync('zdt_user');
-  const pass = await SecureStore.getItemAsync('zdt_pass');
+  const ip = await getItemAsync('zdt_server_ip');
+  const user = await getItemAsync('zdt_user');
+  const pass = await getItemAsync('zdt_pass');
 
   if (ip) {
     config.baseURL = `http://${ip}:5000/api`;
