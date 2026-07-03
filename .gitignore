@@ -43,5 +43,3 @@ example
 /android
 
 # Release Keystore
-release.keystore
-release.keystore.base64
