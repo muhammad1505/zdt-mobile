@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/Colors';
-import { Server, DownloadCloud, FileAudio, Settings } from 'lucide-react-native';
+import { Server, DownloadCloud, FileAudio, Settings, Terminal } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -55,6 +55,13 @@ export default function TabLayout() {
           options={{
             title: 'Files',
             tabBarIcon: ({ color, size }) => <FileAudio color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="tools"
+          options={{
+            title: 'Tools',
+            tabBarIcon: ({ color, size }) => <Terminal color={color} size={size} />,
           }}
         />
         <Tabs.Screen

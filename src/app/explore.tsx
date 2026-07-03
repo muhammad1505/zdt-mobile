@@ -1,180 +1,189 @@
-import { Image } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
-import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { Colors } from '@/constants/Colors';
+import { apiClient } from '@/api/client';
+import { FileAudio, Play, Database } from 'lucide-react-native';
 
-import { ExternalLink } from '@/components/external-link';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Collapsible } from '@/components/ui/collapsible';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+export default function FilesScreen() {
+  const [files, setFiles] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-export default function TabTwoScreen() {
-  const safeAreaInsets = useSafeAreaInsets();
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
+  const fetchFiles = async () => {
+    try {
+      const res = await apiClient.get('/files');
+      setFiles(res.data.files || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
-  const theme = useTheme();
 
-  const contentPlatformStyle = Platform.select({
-    android: {
-      paddingTop: insets.top,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
-      paddingBottom: insets.bottom,
-    },
-    web: {
-      paddingTop: Spacing.six,
-      paddingBottom: Spacing.four,
-    },
-  });
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchFiles();
+    setRefreshing(false);
+  };
+
+  useEffect(() => {
+    fetchFiles();
+  }, []);
+
+  const handleFileAction = async (action: string, filename: string) => {
+    try {
+      const csrf = await getCsrfToken();
+      const res = await apiClient.post('/tools', { action, filename }, { headers: { 'X-CSRF-Token': csrf } });
+      alert(res.data.message);
+    } catch (err: any) {
+      alert('[!] Action failed: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  const renderItem = ({ item }: { item: string }) => (
+    <View style={styles.fileCard}>
+      <View style={styles.fileIcon}>
+        <FileAudio color={Colors.primary} size={24} />
+      </View>
+      <View style={styles.fileInfo}>
+        <Text style={styles.fileName} numberOfLines={1}>{item}</Text>
+        <Text style={styles.fileMeta}>LOCAL_STORAGE</Text>
+        <View style={styles.actionRow}>
+          <TouchableOpacity 
+            style={styles.actionBtn}
+            onPress={() => handleFileAction('demucs', item)}
+          >
+            <Text style={styles.actionText}>DEMUCS</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionBtn, { borderColor: Colors.secondary }]}
+            onPress={() => handleFileAction('compress', item)}
+          >
+            <Text style={[styles.actionText, { color: Colors.secondary }]}>COMPRESS</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
 
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.titleContainer}>
-          <ThemedText type="subtitle">Explore</ThemedText>
-          <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
-          </ThemedText>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>DATA_ARCHIVE</Text>
+        <Database color={Colors.primary} size={24} />
+      </View>
 
-          <ExternalLink href="https://docs.expo.dev" asChild>
-            <Pressable style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedView type="backgroundElement" style={styles.linkButton}>
-                <ThemedText type="link">Expo documentation</ThemedText>
-                <SymbolView
-                  tintColor={theme.text}
-                  name={{ ios: 'arrow.up.right.square', android: 'link', web: 'link' }}
-                  size={12}
-                />
-              </ThemedView>
-            </Pressable>
-          </ExternalLink>
-        </ThemedView>
-
-        <ThemedView style={styles.sectionsWrapper}>
-          <Collapsible title="File-based routing">
-            <ThemedText type="small">
-              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
-              <ThemedText type="code">src/app/explore.tsx</ThemedText>
-            </ThemedText>
-            <ThemedText type="small">
-              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
-              the tab navigator.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/router/introduction">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Android, iOS, and web support">
-            <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
-              <ThemedText type="small">
-                You can open this project on Android, iOS, and the web. To open the web version,
-                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
-                project.
-              </ThemedText>
-              <Image
-                source={require('@/assets/images/tutorial-web.png')}
-                style={styles.imageTutorial}
-              />
-            </ThemedView>
-          </Collapsible>
-
-          <Collapsible title="Images">
-            <ThemedText type="small">
-              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
-              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
-              screen densities.
-            </ThemedText>
-            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
-            <ExternalLink href="https://reactnative.dev/docs/images">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Light and dark mode components">
-            <ThemedText type="small">
-              This template has light and dark mode support. The{' '}
-              <ThemedText type="code">useColorScheme()</ThemedText> hook lets you inspect what the
-              user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Animations">
-            <ThemedText type="small">
-              This template includes an example of an animated component. The{' '}
-              <ThemedText type="code">src/components/ui/collapsible.tsx</ThemedText> component uses
-              the powerful <ThemedText type="code">react-native-reanimated</ThemedText> library to
-              animate opening this hint.
-            </ThemedText>
-          </Collapsible>
-        </ThemedView>
-        {Platform.OS === 'web' && <WebBadge />}
-      </ThemedView>
-    </ScrollView>
+      {loading ? (
+        <ActivityIndicator color={Colors.primary} size="large" style={{ marginTop: 50 }} />
+      ) : (
+        <FlatList
+          data={files}
+          keyExtractor={(item) => item}
+          renderItem={renderItem}
+          contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyText}>NO FILES FOUND IN SERVER STORAGE</Text>
+            </View>
+          }
+        />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    padding: 15,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.primary,
+    paddingBottom: 10,
+  },
+  title: {
+    color: Colors.text,
+    fontSize: 20,
+    fontFamily: 'monospace',
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  list: {
+    paddingBottom: 20,
+  },
+  fileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  fileIcon: {
+    marginRight: 15,
+  },
+  fileInfo: {
     flex: 1,
   },
-  contentContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+  fileName: {
+    color: Colors.text,
+    fontFamily: 'monospace',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
-  container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
+  fileMeta: {
+    color: Colors.textMuted,
+    fontFamily: 'monospace',
+    fontSize: 10,
+    marginTop: 4,
   },
-  titleContainer: {
-    gap: Spacing.three,
+  playBtn: {
+    backgroundColor: Colors.primary,
+    padding: 10,
+    borderRadius: 20,
+    marginLeft: 10,
+  },
+  emptyBox: {
+    padding: 30,
     alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.six,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    marginTop: 20,
   },
-  centerText: {
+  emptyText: {
+    color: Colors.textMuted,
+    fontFamily: 'monospace',
     textAlign: 'center',
   },
-  pressed: {
-    opacity: 0.7,
-  },
-  linkButton: {
+  actionRow: {
     flexDirection: 'row',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
-    justifyContent: 'center',
-    gap: Spacing.one,
-    alignItems: 'center',
+    marginTop: 10,
+    gap: 10,
   },
-  sectionsWrapper: {
-    gap: Spacing.five,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
+  actionBtn: {
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
   },
-  collapsibleContent: {
-    alignItems: 'center',
-  },
-  imageTutorial: {
-    width: '100%',
-    aspectRatio: 296 / 171,
-    borderRadius: Spacing.three,
-    marginTop: Spacing.two,
-  },
-  imageReact: {
-    width: 100,
-    height: 100,
-    alignSelf: 'center',
-  },
+  actionText: {
+    color: Colors.primary,
+    fontFamily: 'monospace',
+    fontSize: 10,
+    fontWeight: 'bold',
+  }
 });
