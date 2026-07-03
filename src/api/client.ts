@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getItemAsync } from '@/utils/storage';
+import { encode } from 'base-64';
 
 export const apiClient = axios.create({
   timeout: 10000,
@@ -15,7 +16,7 @@ apiClient.interceptors.request.use(async (config) => {
   }
   
   if (user && pass) {
-    const encoded = btoa(`${user}:${pass}`);
+    const encoded = encode(`${user}:${pass}`);
     config.headers['Authorization'] = `Basic ${encoded}`;
   }
   
