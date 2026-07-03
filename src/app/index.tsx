@@ -2,18 +2,23 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { apiClient } from '@/api/client';
-import { Cpu, HardDrive, Activity, Wifi } from 'lucide-react-native';
+import { HardDrive, Activity, Wifi, CheckCircle2 } from 'lucide-react-native';
 
 export default function DashboardScreen() {
-  const [stats, setStats] = useState<any>(null);
+  const [statusData, setStatusData] = useState<any>(null);
+  const [statsData, setStatsData] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  const fetchStats = async () => {
+  const fetchData = async () => {
     try {
       setError('');
-      const res = await apiClient.get('/stats');
-      setStats(res.data);
+      const [statusRes, statsRes] = await Promise.all([
+        apiClient.get('/status'),
+        apiClient.get('/stats')
+      ]);
+      setStatusData(statusRes.data);
+      setStatsData(statsRes.data);
     } catch (err: any) {
       setError(err.message || 'Connection lost');
     }
@@ -21,13 +26,13 @@ export default function DashboardScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchStats();
+    await fetchData();
     setRefreshing(false);
   };
 
   useEffect(() => {
-    fetchStats();
-    const interval = setInterval(fetchStats, 5000);
+    fetchData();
+    const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -52,36 +57,38 @@ export default function DashboardScreen() {
       <View style={styles.grid}>
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Cpu color={Colors.primary} size={20} />
-            <Text style={styles.cardTitle}>CPU_LOAD</Text>
+            <Activity color={Colors.primary} size={20} />
+            <Text style={styles.cardTitle}>DOWNLOADS</Text>
           </View>
-          <Text style={styles.cardValue}>{stats?.cpu || '0%'}%</Text>
+          <Text style={styles.cardValue}>{statsData?.total_count || '0'}</Text>
         </View>
 
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Activity color={Colors.secondary} size={20} />
-            <Text style={styles.cardTitle}>RAM_USAGE</Text>
+            <CheckCircle2 color={Colors.secondary} size={20} />
+            <Text style={styles.cardTitle}>FILE_COUNT</Text>
           </View>
-          <Text style={styles.cardValue}>{stats?.ram || '0%'}%</Text>
+          <Text style={styles.cardValue}>{statusData?.file_count || '0'}</Text>
         </View>
 
         <View style={[styles.card, { width: '100%' }]}>
           <View style={styles.cardHeader}>
             <HardDrive color={Colors.accent} size={20} />
-            <Text style={styles.cardTitle}>STORAGE</Text>
+            <Text style={styles.cardTitle}>STORAGE_FREE</Text>
           </View>
-          <Text style={styles.cardValue}>{stats?.storage || '0%'}</Text>
+          <Text style={styles.cardValue}>{statusData?.storage_free || '0 GB'}</Text>
         </View>
       </View>
 
       <View style={styles.logBox}>
-        <Text style={styles.logTitle}>// SYSTEM_UPTIME</Text>
-        <Text style={styles.logText}>{stats?.uptime || 'N/A'}</Text>
-        <Text style={styles.logTitle}>// CORE_TEMP</Text>
-        <Text style={styles.logText}>{stats?.temp || 'N/A'}</Text>
-        <Text style={styles.logTitle}>// OS_VERSION</Text>
-        <Text style={styles.logText}>{stats?.os_name || 'N/A'}</Text>
+        <Text style={styles.logTitle}>// ZDT_VERSION</Text>
+        <Text style={styles.logText}>{statusData?.version || 'N/A'}</Text>
+        <Text style={styles.logTitle}>// TARGET_DIR</Text>
+        <Text style={styles.logText}>{statusData?.target_dir || 'N/A'}</Text>
+        <Text style={styles.logTitle}>// WATCHER_DAEMON</Text>
+        <Text style={styles.logText}>{statusData?.watcher ? 'ACTIVE' : 'OFFLINE'}</Text>
+        <Text style={styles.logTitle}>// TELEGRAM_BOT</Text>
+        <Text style={styles.logText}>{statusData?.telegram ? 'ACTIVE' : 'OFFLINE'}</Text>
       </View>
     </ScrollView>
   );
