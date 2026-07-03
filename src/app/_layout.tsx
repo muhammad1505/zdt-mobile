@@ -9,7 +9,7 @@ export default function TabLayout() {
   
   return (
     <>
-      <StatusBar style="light" backgroundColor={Colors.background} />
+      <StatusBar style="light" />
       <Tabs
         screenOptions={{
           headerStyle: {

@@ -34,7 +34,7 @@ export default function ConsoleScreen() {
   useEffect(() => {
     fetchLogs();
     
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (autoRefresh) {
       interval = setInterval(fetchLogs, 2000);
     }
