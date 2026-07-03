@@ -2,8 +2,11 @@ import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/Colors';
 import { Server, DownloadCloud, FileAudio, Settings, Terminal } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  
   return (
     <>
       <StatusBar style="light" backgroundColor={Colors.background} />
@@ -29,6 +32,8 @@ export default function TabLayout() {
             borderTopWidth: 1,
             borderTopColor: Colors.primary,
             paddingTop: 5,
+            paddingBottom: Math.max(insets.bottom, 5),
+            height: 60 + Math.max(insets.bottom, 0),
           },
           tabBarActiveTintColor: Colors.primary,
           tabBarInactiveTintColor: Colors.textMuted,
@@ -56,10 +61,17 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="console"
+          options={{
+            title: 'Console',
+            tabBarIcon: ({ color, size }) => <Terminal color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
           name="tools"
           options={{
             title: 'Tools',
-            tabBarIcon: ({ color, size }) => <Terminal color={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
           }}
         />
         <Tabs.Screen

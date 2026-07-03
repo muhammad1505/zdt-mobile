@@ -50,14 +50,14 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
-      <Text style={styles.title}>Settings</Text>
+      <Text style={styles.title}>Pengaturan</Text>
       
       <View style={styles.card}>
         <View style={styles.inputGroup}>
           <Server color={Colors.primary} size={20} />
           <TextInput
             style={styles.input}
-            placeholder="SERVER IP (e.g. 192.168.1.5)"
+            placeholder="IP SERVER (contoh: 192.168.1.5)"
             placeholderTextColor={Colors.textMuted}
             value={ip}
             onChangeText={setIp}
@@ -80,7 +80,7 @@ export default function SettingsScreen() {
           <Folder color={Colors.accent} size={20} />
           <TextInput
             style={styles.input}
-            placeholder="SERVER DIRECTORY (/music)"
+            placeholder="DIREKTORI SERVER (/music)"
             placeholderTextColor={Colors.textMuted}
             value={targetDir}
             onChangeText={setTargetDir}
@@ -91,7 +91,7 @@ export default function SettingsScreen() {
           {saving ? (
             <ActivityIndicator color={Colors.background} />
           ) : (
-            <Text style={styles.buttonText}>Save Connection</Text>
+            <Text style={styles.buttonText}>Simpan Pengaturan</Text>
           )}
         </TouchableOpacity>
       </View>

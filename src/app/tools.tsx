@@ -65,7 +65,7 @@ export default function ToolsScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
       <View style={styles.header}>
-        <Text style={styles.title}>COMMAND_CENTER</Text>
+        <Text style={styles.title}>Menu Alat</Text>
         <Terminal color={Colors.primary} size={24} />
       </View>
 
@@ -75,14 +75,14 @@ export default function ToolsScreen() {
         </View>
       ) : null}
 
-      <Text style={styles.sectionTitle}>// DAEMON_CONTROLS</Text>
+      <Text style={styles.sectionTitle}>// KONTROL DAEMON</Text>
       
       <View style={styles.daemonCard}>
         <View style={styles.daemonInfo}>
           <Power color={daemons.watcher ? Colors.primary : Colors.textMuted} size={24} />
           <View style={styles.daemonTextContainer}>
             <Text style={styles.toolName}>Auto-Sync Watcher</Text>
-            <Text style={styles.toolDesc}>Background file monitoring</Text>
+            <Text style={styles.toolDesc}>Memonitor file di latar belakang</Text>
           </View>
         </View>
         <Switch 
@@ -98,7 +98,7 @@ export default function ToolsScreen() {
           <Bot color={daemons.telegram ? Colors.primary : Colors.textMuted} size={24} />
           <View style={styles.daemonTextContainer}>
             <Text style={styles.toolName}>Telegram Bot</Text>
-            <Text style={styles.toolDesc}>Remote control via Telegram</Text>
+            <Text style={styles.toolDesc}>Kontrol server via Telegram</Text>
           </View>
         </View>
         <Switch 
@@ -109,15 +109,15 @@ export default function ToolsScreen() {
         />
       </View>
 
-      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>// AUDIO_PROCESSORS</Text>
+      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>// PEMROSES MEDIA</Text>
       
       <TouchableOpacity style={styles.toolCard} onPress={() => runTool('clean')} disabled={loading}>
         <View style={styles.toolIcon}>
           <Wand2 color={Colors.primary} size={24} />
         </View>
         <View style={styles.toolInfo}>
-          <Text style={styles.toolName}>Clean Filenames</Text>
-          <Text style={styles.toolDesc}>Remove clutter & metadata tags from files</Text>
+          <Text style={styles.toolName}>Bersihkan Nama File</Text>
+          <Text style={styles.toolDesc}>Hapus teks metadata yang tidak perlu</Text>
         </View>
       </TouchableOpacity>
 
@@ -126,8 +126,8 @@ export default function ToolsScreen() {
           <Mic2 color={Colors.secondary} size={24} />
         </View>
         <View style={styles.toolInfo}>
-          <Text style={styles.toolName}>Sync Lyrics</Text>
-          <Text style={styles.toolDesc}>Download and embed synchronized lyrics (.lrc)</Text>
+          <Text style={styles.toolName}>Sinkronisasi Lirik</Text>
+          <Text style={styles.toolDesc}>Unduh lirik lagu secara otomatis (.lrc)</Text>
         </View>
       </TouchableOpacity>
 
@@ -136,20 +136,20 @@ export default function ToolsScreen() {
           <ListMusic color={Colors.accent} size={24} />
         </View>
         <View style={styles.toolInfo}>
-          <Text style={styles.toolName}>Generate Playlist</Text>
-          <Text style={styles.toolDesc}>Compile M3U playlist from storage</Text>
+          <Text style={styles.toolName}>Buat Playlist</Text>
+          <Text style={styles.toolDesc}>Buat file M3U dari penyimpanan</Text>
         </View>
       </TouchableOpacity>
 
-      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>// SYSTEM_DANGER_ZONE</Text>
+      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>// ZONA BERBAHAYA</Text>
 
       <TouchableOpacity style={[styles.toolCard, styles.dangerCard]} onPress={confirmDelete} disabled={loading}>
         <View style={styles.toolIcon}>
           <Trash2 color={Colors.error} size={24} />
         </View>
         <View style={styles.toolInfo}>
-          <Text style={[styles.toolName, { color: Colors.error }]}>Format Storage</Text>
-          <Text style={[styles.toolDesc, { color: Colors.error }]}>Delete all media files in the server</Text>
+          <Text style={[styles.toolName, { color: Colors.error }]}>Format Penyimpanan</Text>
+          <Text style={[styles.toolDesc, { color: Colors.error }]}>Hapus semua file media di server</Text>
         </View>
       </TouchableOpacity>
       

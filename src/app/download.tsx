@@ -13,19 +13,19 @@ export default function DownloadScreen() {
   const handleDownload = async () => {
     if (!url) return;
     setLoading(true);
-    setStatus('ESTABLISHING SECURE LINK...');
+    setStatus('Menghubungkan ke Server...');
     
     try {
       const csrf = await getCsrfToken();
       
-      setStatus('INJECTING PAYLOAD...');
+      setStatus('Memulai proses unduhan...');
       const res = await apiClient.post('/download', 
         { url, format },
         { headers: { 'X-CSRF-Token': csrf } }
       );
       
       if (res.data.success) {
-        setStatus('[OK] TRANSMISSION STARTED');
+        setStatus('[OK] Unduhan dimulai, cek Console');
         setTimeout(() => {
           setUrl('');
           setStatus('');
@@ -34,7 +34,7 @@ export default function DownloadScreen() {
         setStatus('[ERROR] ' + res.data.message);
       }
     } catch (err: any) {
-      setStatus('[ERROR] CONNECTION FAILED');
+      setStatus('[ERROR] Koneksi ke Server Gagal');
     } finally {
       setLoading(false);
     }
