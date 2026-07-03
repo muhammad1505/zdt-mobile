@@ -1,12 +1,38 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Switch } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { apiClient, getCsrfToken } from '@/api/client';
-import { Terminal, Wand2, ListMusic, Mic2, Trash2 } from 'lucide-react-native';
+import { Terminal, Wand2, ListMusic, Mic2, Trash2, Power, Bot } from 'lucide-react-native';
 
 export default function ToolsScreen() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
+  const [daemons, setDaemons] = useState({ watcher: false, telegram: false });
+
+  const fetchStatus = async () => {
+    try {
+      const res = await apiClient.get('/status');
+      setDaemons({ watcher: res.data.watcher, telegram: res.data.telegram });
+    } catch (err) {}
+  };
+
+  useEffect(() => {
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const toggleDaemon = async (daemon: 'watcher' | 'telegram') => {
+    try {
+      const csrf = await getCsrfToken();
+      const action = daemons[daemon] ? 'stop' : 'start';
+      await apiClient.post('/daemon', { daemon, action }, { headers: { 'X-CSRF-Token': csrf } });
+      setDaemons(prev => ({ ...prev, [daemon]: !prev[daemon] }));
+      setStatus(`[OK] ${daemon.toUpperCase()} ${action.toUpperCase()}`);
+    } catch (err: any) {
+      Alert.alert('Error', 'Failed to toggle daemon');
+    }
+  };
 
   const runTool = async (action: string) => {
     setLoading(true);
@@ -37,7 +63,7 @@ export default function ToolsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
       <View style={styles.header}>
         <Text style={styles.title}>COMMAND_CENTER</Text>
         <Terminal color={Colors.primary} size={24} />
@@ -49,14 +75,48 @@ export default function ToolsScreen() {
         </View>
       ) : null}
 
-      <Text style={styles.sectionTitle}>// AUDIO_PROCESSORS</Text>
+      <Text style={styles.sectionTitle}>// DAEMON_CONTROLS</Text>
+      
+      <View style={styles.daemonCard}>
+        <View style={styles.daemonInfo}>
+          <Power color={daemons.watcher ? Colors.primary : Colors.textMuted} size={24} />
+          <View style={styles.daemonTextContainer}>
+            <Text style={styles.toolName}>Auto-Sync Watcher</Text>
+            <Text style={styles.toolDesc}>Background file monitoring</Text>
+          </View>
+        </View>
+        <Switch 
+          value={daemons.watcher} 
+          onValueChange={() => toggleDaemon('watcher')}
+          trackColor={{ false: Colors.border, true: Colors.primary + '80' }}
+          thumbColor={daemons.watcher ? Colors.primary : Colors.textMuted}
+        />
+      </View>
+
+      <View style={styles.daemonCard}>
+        <View style={styles.daemonInfo}>
+          <Bot color={daemons.telegram ? Colors.primary : Colors.textMuted} size={24} />
+          <View style={styles.daemonTextContainer}>
+            <Text style={styles.toolName}>Telegram Bot</Text>
+            <Text style={styles.toolDesc}>Remote control via Telegram</Text>
+          </View>
+        </View>
+        <Switch 
+          value={daemons.telegram} 
+          onValueChange={() => toggleDaemon('telegram')}
+          trackColor={{ false: Colors.border, true: Colors.primary + '80' }}
+          thumbColor={daemons.telegram ? Colors.primary : Colors.textMuted}
+        />
+      </View>
+
+      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>// AUDIO_PROCESSORS</Text>
       
       <TouchableOpacity style={styles.toolCard} onPress={() => runTool('clean')} disabled={loading}>
         <View style={styles.toolIcon}>
           <Wand2 color={Colors.primary} size={24} />
         </View>
         <View style={styles.toolInfo}>
-          <Text style={styles.toolName}>CLEAN_FILENAMES</Text>
+          <Text style={styles.toolName}>Clean Filenames</Text>
           <Text style={styles.toolDesc}>Remove clutter & metadata tags from files</Text>
         </View>
       </TouchableOpacity>
@@ -66,7 +126,7 @@ export default function ToolsScreen() {
           <Mic2 color={Colors.secondary} size={24} />
         </View>
         <View style={styles.toolInfo}>
-          <Text style={styles.toolName}>SYNC_LYRICS</Text>
+          <Text style={styles.toolName}>Sync Lyrics</Text>
           <Text style={styles.toolDesc}>Download and embed synchronized lyrics (.lrc)</Text>
         </View>
       </TouchableOpacity>
@@ -76,7 +136,7 @@ export default function ToolsScreen() {
           <ListMusic color={Colors.accent} size={24} />
         </View>
         <View style={styles.toolInfo}>
-          <Text style={styles.toolName}>GENERATE_PLAYLIST</Text>
+          <Text style={styles.toolName}>Generate Playlist</Text>
           <Text style={styles.toolDesc}>Compile M3U playlist from storage</Text>
         </View>
       </TouchableOpacity>
@@ -88,7 +148,7 @@ export default function ToolsScreen() {
           <Trash2 color={Colors.error} size={24} />
         </View>
         <View style={styles.toolInfo}>
-          <Text style={[styles.toolName, { color: Colors.error }]}>FORMAT_STORAGE</Text>
+          <Text style={[styles.toolName, { color: Colors.error }]}>Format Storage</Text>
           <Text style={[styles.toolDesc, { color: Colors.error }]}>Delete all media files in the server</Text>
         </View>
       </TouchableOpacity>
@@ -139,6 +199,25 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 10,
   },
+  daemonCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  daemonInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  daemonTextContainer: {
+    marginLeft: 15,
+  },
   toolCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -147,7 +226,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     padding: 15,
     borderRadius: 8,
-    marginBottom: 15,
+    marginBottom: 10,
   },
   dangerCard: {
     borderColor: Colors.error,
@@ -168,7 +247,7 @@ const styles = StyleSheet.create({
   toolDesc: {
     color: Colors.textMuted,
     fontFamily: 'monospace',
-    fontSize: 11,
+    fontSize: 12,
     marginTop: 4,
   }
 });

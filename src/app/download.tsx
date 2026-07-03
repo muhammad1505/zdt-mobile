@@ -46,8 +46,8 @@ export default function DownloadScreen() {
       style={styles.container}
     >
       <View style={styles.header}>
-        <Text style={styles.title}>DATA_EXTRACTOR</Text>
-        <Text style={styles.subtitle}>// INPUT TARGET URL</Text>
+        <Text style={styles.title}>Downloader</Text>
+        <Text style={styles.subtitle}>Enter media URL to extract</Text>
       </View>
 
       <View style={styles.inputContainer}>
@@ -69,7 +69,7 @@ export default function DownloadScreen() {
           onPress={() => setFormat('audio')}
         >
           <Music color={format === 'audio' ? Colors.background : Colors.primary} size={20} />
-          <Text style={[styles.formatText, format === 'audio' && styles.formatTextActive]}>AUDIO</Text>
+          <Text style={[styles.formatText, format === 'audio' && styles.formatTextActive]}>Audio</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
@@ -77,7 +77,7 @@ export default function DownloadScreen() {
           onPress={() => setFormat('video')}
         >
           <Video color={format === 'video' ? Colors.background : Colors.primary} size={20} />
-          <Text style={[styles.formatText, format === 'video' && styles.formatTextActive]}>VIDEO</Text>
+          <Text style={[styles.formatText, format === 'video' && styles.formatTextActive]}>Video</Text>
         </TouchableOpacity>
       </View>
 
@@ -91,7 +91,7 @@ export default function DownloadScreen() {
         ) : (
           <>
             <Download color={url ? Colors.background : Colors.textMuted} size={24} />
-            <Text style={[styles.downloadText, !url && styles.downloadTextDisabled]}>EXECUTE</Text>
+            <Text style={[styles.downloadText, !url && styles.downloadTextDisabled]}>Download</Text>
           </>
         )}
       </TouchableOpacity>

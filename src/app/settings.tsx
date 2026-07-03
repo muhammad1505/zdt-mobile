@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { getItemAsync, setItemAsync } from '@/utils/storage';
-import { Server, Key, User } from 'lucide-react-native';
+import { apiClient, getCsrfToken } from '@/api/client';
+import { Server, Key, User, Folder } from 'lucide-react-native';
 
 export default function SettingsScreen() {
   const [ip, setIp] = useState('');
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
+  const [targetDir, setTargetDir] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -18,6 +20,11 @@ export default function SettingsScreen() {
       if (savedIp) setIp(savedIp);
       if (savedUser) setUser(savedUser);
       if (savedPass) setPass(savedPass);
+      
+      try {
+        const res = await apiClient.get('/status');
+        if (res.data.target_dir) setTargetDir(res.data.target_dir);
+      } catch (err) {}
     })();
   }, []);
 
@@ -26,15 +33,25 @@ export default function SettingsScreen() {
     await setItemAsync('zdt_server_ip', ip);
     await setItemAsync('zdt_user', user);
     await setItemAsync('zdt_pass', pass);
-    setTimeout(() => {
+    
+    try {
+      if (targetDir) {
+        const csrf = await getCsrfToken();
+        await apiClient.post('/settings/storage', { target_dir: targetDir }, { headers: { 'X-CSRF-Token': csrf } });
+      }
+      setTimeout(() => {
+        setSaving(false);
+        Alert.alert('Success', 'Koneksi & Pengaturan Disimpan!');
+      }, 500);
+    } catch (err) {
       setSaving(false);
-      alert('Koneksi Server Disimpan!');
-    }, 500);
+      Alert.alert('Warning', 'Saved connection, but failed to update target directory. Server might be unreachable.');
+    }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>NETRUNNER_CONFIG</Text>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+      <Text style={styles.title}>Settings</Text>
       
       <View style={styles.card}>
         <View style={styles.inputGroup}>
@@ -71,15 +88,26 @@ export default function SettingsScreen() {
           />
         </View>
 
+        <View style={styles.inputGroup}>
+          <Folder color={Colors.accent} size={20} />
+          <TextInput
+            style={styles.input}
+            placeholder="SERVER DIRECTORY (/music)"
+            placeholderTextColor={Colors.textMuted}
+            value={targetDir}
+            onChangeText={setTargetDir}
+          />
+        </View>
+
         <TouchableOpacity style={styles.button} onPress={handleSave} disabled={saving}>
           {saving ? (
             <ActivityIndicator color={Colors.background} />
           ) : (
-            <Text style={styles.buttonText}>ESTABLISH LINK</Text>
+            <Text style={styles.buttonText}>Save Connection</Text>
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 

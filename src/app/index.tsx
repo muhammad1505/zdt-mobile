@@ -39,12 +39,13 @@ export default function DashboardScreen() {
   return (
     <ScrollView 
       style={styles.container}
+      contentContainerStyle={{ paddingBottom: 100 }}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
       }
     >
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>SYSTEM_DIAGNOSTICS</Text>
+        <Text style={styles.headerTitle}>Dashboard</Text>
         <Wifi color={error ? Colors.error : Colors.primary} size={24} />
       </View>
 
@@ -58,7 +59,7 @@ export default function DashboardScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Activity color={Colors.primary} size={20} />
-            <Text style={styles.cardTitle}>DOWNLOADS</Text>
+            <Text style={styles.cardTitle}>Downloads</Text>
           </View>
           <Text style={styles.cardValue}>{statsData?.total_count || '0'}</Text>
         </View>
@@ -66,7 +67,7 @@ export default function DashboardScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <CheckCircle2 color={Colors.secondary} size={20} />
-            <Text style={styles.cardTitle}>FILE_COUNT</Text>
+            <Text style={styles.cardTitle}>Total Files</Text>
           </View>
           <Text style={styles.cardValue}>{statusData?.file_count || '0'}</Text>
         </View>
@@ -74,20 +75,20 @@ export default function DashboardScreen() {
         <View style={[styles.card, { width: '100%' }]}>
           <View style={styles.cardHeader}>
             <HardDrive color={Colors.accent} size={20} />
-            <Text style={styles.cardTitle}>STORAGE_FREE</Text>
+            <Text style={styles.cardTitle}>Storage Free</Text>
           </View>
           <Text style={styles.cardValue}>{statusData?.storage_free || '0 GB'}</Text>
         </View>
       </View>
 
       <View style={styles.logBox}>
-        <Text style={styles.logTitle}>// ZDT_VERSION</Text>
+        <Text style={styles.logTitle}>// ZDT Version</Text>
         <Text style={styles.logText}>{statusData?.version || 'N/A'}</Text>
-        <Text style={styles.logTitle}>// TARGET_DIR</Text>
+        <Text style={styles.logTitle}>// Target Directory</Text>
         <Text style={styles.logText}>{statusData?.target_dir || 'N/A'}</Text>
-        <Text style={styles.logTitle}>// WATCHER_DAEMON</Text>
+        <Text style={styles.logTitle}>// Watcher Daemon</Text>
         <Text style={styles.logText}>{statusData?.watcher ? 'ACTIVE' : 'OFFLINE'}</Text>
-        <Text style={styles.logTitle}>// TELEGRAM_BOT</Text>
+        <Text style={styles.logTitle}>// Telegram Bot</Text>
         <Text style={styles.logText}>{statusData?.telegram ? 'ACTIVE' : 'OFFLINE'}</Text>
       </View>
     </ScrollView>

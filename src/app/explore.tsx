@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { Colors } from '@/constants/Colors';
-import { apiClient } from '@/api/client';
+import { apiClient, getCsrfToken } from '@/api/client';
 import { FileAudio, Play, Database } from 'lucide-react-native';
 
 export default function FilesScreen() {
@@ -34,9 +34,9 @@ export default function FilesScreen() {
     try {
       const csrf = await getCsrfToken();
       const res = await apiClient.post('/tools', { action, filename }, { headers: { 'X-CSRF-Token': csrf } });
-      alert(res.data.message);
+      Alert.alert('Success', res.data.message);
     } catch (err: any) {
-      alert('[!] Action failed: ' + (err.message || 'Unknown error'));
+      Alert.alert('Error', '[!] Action failed: ' + (err.message || 'Unknown error'));
     }
   };
 
@@ -47,19 +47,19 @@ export default function FilesScreen() {
       </View>
       <View style={styles.fileInfo}>
         <Text style={styles.fileName} numberOfLines={1}>{item}</Text>
-        <Text style={styles.fileMeta}>LOCAL_STORAGE</Text>
+        <Text style={styles.fileMeta}>Local Storage</Text>
         <View style={styles.actionRow}>
           <TouchableOpacity 
             style={styles.actionBtn}
             onPress={() => handleFileAction('demucs', item)}
           >
-            <Text style={styles.actionText}>DEMUCS</Text>
+            <Text style={styles.actionText}>Demucs</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.actionBtn, { borderColor: Colors.secondary }]}
             onPress={() => handleFileAction('compress', item)}
           >
-            <Text style={[styles.actionText, { color: Colors.secondary }]}>COMPRESS</Text>
+            <Text style={[styles.actionText, { color: Colors.secondary }]}>Compress</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -69,7 +69,7 @@ export default function FilesScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>DATA_ARCHIVE</Text>
+        <Text style={styles.title}>Data Archive</Text>
         <Database color={Colors.primary} size={24} />
       </View>
 
@@ -86,7 +86,7 @@ export default function FilesScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>NO FILES FOUND IN SERVER STORAGE</Text>
+              <Text style={styles.emptyText}>No files found in server storage</Text>
             </View>
           }
         />
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   list: {
-    paddingBottom: 20,
+    paddingBottom: 100,
   },
   fileCard: {
     flexDirection: 'row',
