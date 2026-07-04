@@ -2,20 +2,13 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { apiClient, getCsrfToken } from '@/api/client';
-import { FileAudio, Play, Database, Square, Pause } from 'lucide-react-native';
-import { Audio } from 'expo-av';
-import { getItemAsync } from '@/utils/storage';
+import { FileAudio, Database } from 'lucide-react-native';
 
 export default function FilesScreen() {
   const [files, setFiles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
-  // Audio Player State
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [playingFile, setPlayingFile] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-
   const fetchFiles = async () => {
     try {
       const res = await apiClient.get('/files');
@@ -35,11 +28,6 @@ export default function FilesScreen() {
 
   useEffect(() => {
     fetchFiles();
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
   }, []);
 
   const handleFileAction = async (action: string, filename: string) => {
@@ -52,66 +40,14 @@ export default function FilesScreen() {
     }
   };
 
-  const playAudio = async (filename: string) => {
-    try {
-      // Stop currently playing
-      if (sound) {
-        await sound.unloadAsync();
-        setSound(null);
-        if (playingFile === filename && isPlaying) {
-          setPlayingFile(null);
-          setIsPlaying(false);
-          return;
-        }
-      }
-      
-      const ip = (await getItemAsync('zdt_server_ip')) || process.env.EXPO_PUBLIC_SERVER_IP;
-      const apiKey = (await getItemAsync('zdt_api_key')) || process.env.EXPO_PUBLIC_API_KEY;
-      
-      const baseUrl = ip?.includes(':') ? `http://${ip}` : `http://${ip}:5000`;
-      const uri = `${baseUrl}/api/stream/${encodeURIComponent(filename)}`;
-      
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-      });
-
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { 
-          uri,
-          headers: apiKey ? { 'X-API-Key': apiKey } : undefined
-        },
-        { shouldPlay: true }
-      );
-      
-      setSound(newSound);
-      setPlayingFile(filename);
-      setIsPlaying(true);
-
-      newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          setIsPlaying(false);
-          setPlayingFile(null);
-        }
-      });
-      
-    } catch (err: any) {
-      Alert.alert('Playback Error', err.message || 'Failed to stream audio');
-      setPlayingFile(null);
-      setIsPlaying(false);
-    }
-  };
-
   const renderItem = ({ item }: { item: string }) => {
-    const isThisPlaying = playingFile === item;
-    
     return (
       <View style={styles.fileCard}>
         <View style={styles.fileIcon}>
-          <FileAudio color={isThisPlaying ? Colors.accent : Colors.primary} size={24} />
+          <FileAudio color={Colors.primary} size={24} />
         </View>
         <View style={styles.fileInfo}>
-          <Text style={[styles.fileName, isThisPlaying && { color: Colors.accent }]} numberOfLines={1}>{item}</Text>
+          <Text style={styles.fileName} numberOfLines={1}>{item}</Text>
           <Text style={styles.fileMeta}>Cloud Streaming Server</Text>
           <View style={styles.actionRow}>
             <TouchableOpacity 
@@ -128,17 +64,6 @@ export default function FilesScreen() {
             </TouchableOpacity>
           </View>
         </View>
-        
-        <TouchableOpacity 
-          style={[styles.playBtn, isThisPlaying && { backgroundColor: Colors.accent }]} 
-          onPress={() => playAudio(item)}
-        >
-          {isThisPlaying && isPlaying ? (
-            <Square color={Colors.background} size={20} fill={Colors.background} />
-          ) : (
-            <Play color={Colors.background} size={20} fill={Colors.background} />
-          )}
-        </TouchableOpacity>
       </View>
     );
   };
@@ -225,12 +150,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 4,
   },
-  playBtn: {
-    backgroundColor: Colors.primary,
-    padding: 15,
-    borderRadius: 8,
-    marginLeft: 10,
-  },
+
   emptyBox: {
     padding: 30,
     alignItems: 'center',
