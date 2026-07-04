@@ -49,7 +49,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+    <ScrollView style={styles.container} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 20, paddingBottom: 100 }}>
       <Text style={styles.title}>Pengaturan</Text>
       
       <View style={styles.card}>
@@ -103,8 +103,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    padding: 20,
-    justifyContent: 'center',
   },
   title: {
     color: Colors.primary,
