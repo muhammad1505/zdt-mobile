@@ -10,7 +10,11 @@ apiClient.interceptors.request.use(async (config) => {
   const apiKey = (await getItemAsync('zdt_api_key')) || process.env.EXPO_PUBLIC_API_KEY;
 
   if (ip) {
-    config.baseURL = `http://${ip}:5000/api`;
+    if (ip.includes(':')) {
+      config.baseURL = `http://${ip}/api`;
+    } else {
+      config.baseURL = `http://${ip}:5000/api`;
+    }
   }
   
   if (apiKey) {

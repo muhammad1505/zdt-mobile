@@ -68,7 +68,8 @@ export default function FilesScreen() {
       const ip = (await getItemAsync('zdt_server_ip')) || process.env.EXPO_PUBLIC_SERVER_IP;
       const apiKey = (await getItemAsync('zdt_api_key')) || process.env.EXPO_PUBLIC_API_KEY;
       
-      const uri = `http://${ip}:5000/api/stream/${encodeURIComponent(filename)}`;
+      const baseUrl = ip?.includes(':') ? `http://${ip}` : `http://${ip}:5000`;
+      const uri = `${baseUrl}/api/stream/${encodeURIComponent(filename)}`;
       
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
