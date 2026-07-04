@@ -10,7 +10,7 @@
     "axios": "^1.18.1",
     "base-64": "^1.0.0",
     "expo": "~57.0.1",
-    "expo-av": "^16.0.8",
+    "expo-av": "15.1.7",
     "expo-build-properties": "~57.0.2",
     "expo-constants": "~57.0.2",
     "expo-device": "~57.0.0",
