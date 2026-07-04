@@ -6,8 +6,8 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(async (config) => {
-  const ip = (await getItemAsync('zdt_server_ip')) || process.env.EXPO_PUBLIC_SERVER_IP;
-  const apiKey = (await getItemAsync('zdt_api_key')) || process.env.EXPO_PUBLIC_API_KEY;
+  const ip = (await getItemAsync('zdt_server_ip').catch(() => null)) || process.env.EXPO_PUBLIC_SERVER_IP;
+  const apiKey = (await getItemAsync('zdt_api_key').catch(() => null)) || process.env.EXPO_PUBLIC_API_KEY;
 
   if (ip) {
     if (ip.includes(':')) {
