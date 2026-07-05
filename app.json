@@ -31,7 +31,10 @@
         {
           "android": {
             "usesCleartextTraffic": true,
-            "newArchEnabled": false
+            "newArchEnabled": false,
+            "extraGradleProperties": {
+              "org.gradle.jvmargs": "-Xmx4g"
+            }
           }
         }
       ],
