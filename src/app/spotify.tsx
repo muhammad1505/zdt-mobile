@@ -1,40 +1,34 @@
-import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, FlatList } from 'react-native';
 import { Colors } from '@/constants/Colors';
-import { runTool } from '@/api/client';
-import { Music, RefreshCw, ListMusic } from 'lucide-react-native';
+import { startDownload, getDownloads } from '@/api/client';
+import { Music, ListMusic } from 'lucide-react-native';
 
 export default function SpotifyScreen() {
-  const [playlistUrl, setPlaylistUrl] = useState('');
+  const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
+  const [recent, setRecent] = useState<any[]>([]);
 
-  const handleSync = async () => {
-    if (!playlistUrl) return;
+  useEffect(() => {
+    getDownloads(1, '').then((r) => setRecent((r.downloads || []).filter((d: any) => d.url?.includes('spotify')).slice(0, 10))).catch(() => {});
+  }, []);
+
+  const handleDownload = async () => {
+    if (!url) return;
     setLoading(true);
-    setStatus('Syncing Spotify playlist...');
+    setStatus('Downloading from Spotify...');
     try {
-      await runTool('spotify_sync', playlistUrl);
-      setStatus('[OK] Sync initiated');
-      setTimeout(() => { setStatus(''); setPlaylistUrl(''); }, 2000);
+      await startDownload(url, 'audio');
+      setStatus('[OK] Download started. Check Downloads tab.');
+      setUrl('');
+      const r = await getDownloads(1, '');
+      setRecent((r.downloads || []).filter((d: any) => d.url?.includes('spotify')).slice(0, 10));
     } catch (e: any) {
       setStatus(`[!] ${e.message}`);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleRefresh = async () => {
-    setLoading(true);
-    setStatus('Refreshing playlists...');
-    try {
-      await runTool('spotify_refresh');
-      setStatus('[OK] Playlists refreshed');
-      setTimeout(() => setStatus(''), 2000);
-    } catch (e: any) {
-      setStatus(`[!] ${e.message}`);
-    } finally {
-      setLoading(false);
+      setTimeout(() => setStatus(''), 3000);
     }
   };
 
@@ -47,41 +41,46 @@ export default function SpotifyScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
         <View style={s.card}>
-          <Text style={s.cardTitle}>Sync Playlist</Text>
-          <Text style={s.cardDesc}>Sync a Spotify playlist to server storage</Text>
+          <Text style={s.cardTitle}>Download from Spotify</Text>
+          <Text style={s.cardDesc}>Enter a track, album, or playlist URL</Text>
           <TextInput
             style={s.input}
-            placeholder="https://open.spotify.com/playlist/..."
+            placeholder="https://open.spotify.com/track/..."
             placeholderTextColor={Colors.textMuted}
-            value={playlistUrl}
-            onChangeText={setPlaylistUrl}
+            value={url}
+            onChangeText={setUrl}
             autoCapitalize="none"
           />
-          <TouchableOpacity style={s.btn} onPress={handleSync} disabled={loading || !playlistUrl}>
-            {loading ? <ActivityIndicator color={Colors.background} /> : <Text style={s.btnText}>Sync</Text>}
+          <TouchableOpacity style={s.btn} onPress={handleDownload} disabled={loading || !url}>
+            {loading ? <ActivityIndicator color={Colors.background} /> : <Text style={s.btnText}>Download</Text>}
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={s.cardAction} onPress={handleRefresh} disabled={loading}>
-          <RefreshCw color={Colors.primary} size={20} />
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={s.actionTitle}>Refresh Playlists</Text>
-            <Text style={s.actionDesc}>Update all synced Spotify playlists</Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={s.cardAction} onPress={() => runTool('playlist').then(() => Alert.alert('Done', 'M3U playlist created')).catch(() => {})} disabled={loading}>
-          <ListMusic color={Colors.accent} size={20} />
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={s.actionTitle}>Generate M3U</Text>
-            <Text style={s.actionDesc}>Create playlist file from storage</Text>
-          </View>
-        </TouchableOpacity>
-
         {status ? (
-          <View style={s.statusBox}>
-            <Text style={s.statusText}>{status}</Text>
-          </View>
+          <View style={s.statusBox}><Text style={s.statusText}>{status}</Text></View>
+        ) : null}
+
+        <Text style={s.sectionTitle}>// HOW IT WORKS</Text>
+        <View style={s.infoCard}>
+          <Text style={s.infoText}>
+            • Enter any Spotify track, album, or playlist URL{'\n'}
+            • Server downloads using spotdl{'\n'}
+            • File auto-downloads to device{'\n'}
+            • Auto-deleted from server afterward
+          </Text>
+        </View>
+
+        {recent.length > 0 ? (
+          <>
+            <Text style={s.sectionTitle}>// RECENT SPOTIFY</Text>
+            {recent.map((d: any) => (
+              <View key={d.id} style={s.dlRow}>
+                <ListMusic color={Colors.textMuted} size={14} />
+                <Text style={s.dlName} numberOfLines={1}>{d.title || d.url?.slice(0, 40)}</Text>
+                <Text style={s.dlStatus}>{d.status}</Text>
+              </View>
+            ))}
+          </>
         ) : null}
       </ScrollView>
     </View>
@@ -99,21 +98,15 @@ const s = StyleSheet.create({
   card: { backgroundColor: Colors.surface, borderRadius: 10, padding: 18, borderWidth: 1, borderColor: Colors.border, marginBottom: 16 },
   cardTitle: { color: Colors.text, fontFamily: 'monospace', fontSize: 14, fontWeight: '700' },
   cardDesc: { color: Colors.textMuted, fontFamily: 'monospace', fontSize: 11, marginTop: 4, marginBottom: 16 },
-  input: {
-    backgroundColor: Colors.background, color: Colors.text, fontFamily: 'monospace', fontSize: 13,
-    borderWidth: 1, borderColor: Colors.border, borderRadius: 8, padding: 14, marginBottom: 14,
-  },
+  input: { backgroundColor: Colors.background, color: Colors.text, fontFamily: 'monospace', fontSize: 13, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, padding: 14, marginBottom: 14 },
   btn: { backgroundColor: Colors.primary, height: 48, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   btnText: { color: Colors.background, fontFamily: 'monospace', fontWeight: '700', fontSize: 14 },
-  cardAction: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface,
-    padding: 16, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, marginBottom: 10,
-  },
-  actionTitle: { color: Colors.text, fontFamily: 'monospace', fontSize: 14, fontWeight: '600' },
-  actionDesc: { color: Colors.textMuted, fontFamily: 'monospace', fontSize: 11, marginTop: 2 },
-  statusBox: {
-    backgroundColor: Colors.card, borderRadius: 8, padding: 14, marginTop: 10,
-    borderLeftWidth: 3, borderLeftColor: Colors.primary,
-  },
+  statusBox: { backgroundColor: Colors.card, borderRadius: 8, padding: 14, marginBottom: 16, borderLeftWidth: 3, borderLeftColor: Colors.primary },
   statusText: { color: Colors.primary, fontFamily: 'monospace', fontSize: 12 },
+  sectionTitle: { color: Colors.textMuted, fontFamily: 'monospace', fontSize: 10, letterSpacing: 1.5, marginBottom: 10, marginTop: 20 },
+  infoCard: { backgroundColor: Colors.surface, borderRadius: 8, padding: 16, borderWidth: 1, borderColor: Colors.border },
+  infoText: { color: Colors.textMuted, fontFamily: 'monospace', fontSize: 12, lineHeight: 20 },
+  dlRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, padding: 12, borderRadius: 6, marginBottom: 6, borderWidth: 1, borderColor: Colors.border, gap: 8 },
+  dlName: { flex: 1, color: Colors.text, fontFamily: 'monospace', fontSize: 11 },
+  dlStatus: { color: Colors.textMuted, fontFamily: 'monospace', fontSize: 10, textTransform: 'uppercase' },
 });
