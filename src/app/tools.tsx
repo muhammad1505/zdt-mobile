@@ -4,7 +4,7 @@ import {
   ActivityIndicator, Alert
 } from 'react-native';
 import { Colors } from '@/constants/Colors';
-import { runTool, getDownloadUrl } from '@/api/client';
+import { runTool } from '@/api/client';
 import { useServerStore } from '@/store/serverStore';
 import { Terminal, Wand2, ListMusic, Mic2, Trash2, Wifi, HardDrive, Activity } from 'lucide-react-native';
 

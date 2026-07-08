@@ -110,7 +110,7 @@ export default function FilesScreen() {
         if (status.playing) { player.pause(); } else { player.play(); }
         return;
       }
-      const streamUrl = getStreamUrl(filePath);
+      const streamUrl = await getStreamUrl(filePath);
       setPlayingFile(filePath);
       player.replace(streamUrl);
       player.play();

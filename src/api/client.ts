@@ -145,12 +145,22 @@ export const createDirectory = async (path: string): Promise<void> => {
   await apiClient.post('/files/mkdir', { path });
 };
 
-export const getDownloadUrl = (filePath: string): string => {
-  return `${_baseURL}/dl/${encodeURIComponent(filePath)}`;
+const getBaseUrl = async (): Promise<string> => {
+  if (_baseURL) return _baseURL;
+  const ip = await getItemAsync('zdt_server_ip').catch(() => null) || process.env.EXPO_PUBLIC_SERVER_IP || '';
+  if (!ip) return '';
+  const port = ip.includes(':') ? '' : ':2000';
+  return `http://${ip}${port}/api`;
 };
 
-export const getStreamUrl = (filePath: string): string => {
-  return `${_baseURL}/stream/${encodeURIComponent(filePath)}`;
+export const getDownloadUrl = async (filePath: string): Promise<string> => {
+  const base = await getBaseUrl();
+  return `${base}/dl/${encodeURIComponent(filePath)}`;
+};
+
+export const getStreamUrl = async (filePath: string): Promise<string> => {
+  const base = await getBaseUrl();
+  return `${base}/stream/${encodeURIComponent(filePath)}`;
 };
 
 // ─── Downloads ──────────────────────────────────
