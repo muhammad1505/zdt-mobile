@@ -1,71 +1,108 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Switch } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  ActivityIndicator, Alert, Switch, RefreshControl
+} from 'react-native';
 import { Colors } from '@/constants/Colors';
-import { apiClient, getCsrfToken } from '@/api/client';
-import { Terminal, Wand2, ListMusic, Mic2, Trash2, Power, Bot } from 'lucide-react-native';
+import {
+  getServerInfo, runTool, controlDaemon,
+  getServices, manageService, getVpnStatus,
+  vpnConnect, vpnDisconnect, vpnRestart,
+} from '@/api/client';
+import { useServerStore } from '@/store/serverStore';
+import {
+  Terminal, Wand2, ListMusic, Mic2, Trash2, Power, Bot,
+  Server, Wifi, WifiOff, RefreshCcw, Play, StopCircle
+} from 'lucide-react-native';
+import type { ServiceInfo } from '@/types/api';
 
 export default function ToolsScreen() {
+  const { info, setInfo } = useServerStore();
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
-  const [daemons, setDaemons] = useState({ watcher: false, telegram: false });
+  const [services, setServices] = useState<ServiceInfo[]>([]);
+  const [vpnConnected, setVpnConnected] = useState(false);
+  const [vpnIp, setVpnIp] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchStatus = async () => {
+  const fetchAll = useCallback(async () => {
     try {
-      const res = await apiClient.get('/status');
-      setDaemons({ watcher: res.data.watcher, telegram: res.data.telegram });
-    } catch (err) {}
-  };
-
-  useEffect(() => {
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 5000);
-    return () => clearInterval(interval);
+      const [svc, vpn] = await Promise.all([
+        getServices().catch(() => []),
+        getVpnStatus().catch(() => null),
+      ]);
+      setServices(svc);
+      if (vpn) {
+        setVpnConnected(vpn.connected);
+        setVpnIp(vpn.ip || '');
+      }
+      getServerInfo().catch(() => {});
+    } catch {}
   }, []);
 
-  const toggleDaemon = async (daemon: 'watcher' | 'telegram') => {
+  useEffect(() => {
+    fetchAll();
+    const interval = setInterval(fetchAll, 5000);
+    return () => clearInterval(interval);
+  }, [fetchAll]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchAll();
+    setRefreshing(false);
+  };
+
+  const daemonRunning = (name: string) => {
+    const svc = services.find((s) => s.name === name);
+    return svc ? svc.status === 'running' : false;
+  };
+
+  const handleToggleDaemon = async (name: string) => {
+    const running = daemonRunning(name);
     try {
-      const csrf = await getCsrfToken();
-      const action = daemons[daemon] ? 'stop' : 'start';
-      await apiClient.post('/daemon', { daemon, action }, { headers: { 'X-CSRF-Token': csrf } });
-      setDaemons(prev => ({ ...prev, [daemon]: !prev[daemon] }));
-      setStatus(`[OK] ${daemon.toUpperCase()} ${action.toUpperCase()}`);
-    } catch (err: any) {
-      Alert.alert('Error', 'Failed to toggle daemon');
+      await manageService(name, running ? 'stop' : 'start');
+      setStatus(`[OK] ${name.toUpperCase()} ${running ? 'STOPPED' : 'STARTED'}`);
+      fetchAll();
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
     }
   };
 
-  const runTool = async (action: string) => {
+  const handleTool = async (action: string, filename?: string) => {
     setLoading(true);
-    setStatus(`EXECUTING /bin/${action}.sh ...`);
+    setStatus(`EXECUTING ${action}...`);
     try {
-      const csrf = await getCsrfToken();
-      const res = await apiClient.post('/tools', { action }, { headers: { 'X-CSRF-Token': csrf } });
-      setStatus(res.data.message);
-      if (action === 'delete_all') {
-        Alert.alert('Storage Wiped', res.data.message);
-      }
-    } catch (err: any) {
-      setStatus('[!] ' + (err.message || 'COMMAND FAILED'));
+      await runTool(action, filename);
+      setStatus(`[OK] ${action} selesai`);
+    } catch (e: any) {
+      setStatus(`[!] ${e.message || 'FAILED'}`);
     } finally {
       setLoading(false);
     }
   };
 
   const confirmDelete = () => {
-    Alert.alert(
-      'DANGER: WIPE STORAGE',
-      'Are you sure you want to format the storage directory? All media files will be lost.',
-      [
-        { text: 'CANCEL', style: 'cancel' },
-        { text: 'FORMAT', style: 'destructive', onPress: () => runTool('delete_all') }
-      ]
-    );
+    Alert.alert('DANGER: WIPE STORAGE', 'All media files will be lost.', [
+      { text: 'CANCEL', style: 'cancel' },
+      { text: 'FORMAT', style: 'destructive', onPress: () => handleTool('delete_all') },
+    ]);
+  };
+
+  const confirmVpnRestart = () => {
+    Alert.alert('VPN Restart', 'Restart VPN connection?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Restart', onPress: async () => { try { await vpnRestart(); setStatus('[OK] VPN restart initiated'); fetchAll(); } catch (e: any) { Alert.alert('Error', e.message); } } },
+    ]);
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 100 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+    >
       <View style={styles.header}>
-        <Text style={styles.title}>Menu Alat</Text>
+        <Text style={styles.title}>Tools</Text>
         <Terminal color={Colors.primary} size={24} />
       </View>
 
@@ -75,179 +112,129 @@ export default function ToolsScreen() {
         </View>
       ) : null}
 
-      <Text style={styles.sectionTitle}>// KONTROL DAEMON</Text>
-      
-      <View style={styles.daemonCard}>
-        <View style={styles.daemonInfo}>
-          <Power color={daemons.watcher ? Colors.primary : Colors.textMuted} size={24} />
-          <View style={styles.daemonTextContainer}>
-            <Text style={styles.toolName}>Auto-Sync Watcher</Text>
-            <Text style={styles.toolDesc}>Memonitor file di latar belakang</Text>
+      {/* VPN Section */}
+      <Text style={styles.sectionTitle}>// VPN</Text>
+      <View style={styles.card}>
+        <View style={styles.cardRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            {vpnConnected ? <Wifi color={Colors.primary} size={22} /> : <WifiOff color={Colors.textMuted} size={22} />}
+            <View>
+              <Text style={styles.toolName}>{vpnConnected ? 'Connected' : 'Disconnected'}</Text>
+              {vpnIp ? <Text style={styles.toolDesc}>{vpnIp}</Text> : null}
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {vpnConnected ? (
+              <TouchableOpacity style={styles.smallBtn} onPress={() => vpnDisconnect().then(fetchAll).catch(() => {})}>
+                <StopCircle color={Colors.error} size={18} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.smallBtn} onPress={() => vpnConnect().then(fetchAll).catch(() => {})}>
+                <Play color={Colors.accent} size={18} />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.smallBtn} onPress={confirmVpnRestart}>
+              <RefreshCcw color={Colors.secondary} size={18} />
+            </TouchableOpacity>
           </View>
         </View>
-        <Switch 
-          value={daemons.watcher} 
-          onValueChange={() => toggleDaemon('watcher')}
-          trackColor={{ false: Colors.border, true: Colors.primary + '80' }}
-          thumbColor={daemons.watcher ? Colors.primary : Colors.textMuted}
-        />
       </View>
 
-      <View style={styles.daemonCard}>
-        <View style={styles.daemonInfo}>
-          <Bot color={daemons.telegram ? Colors.primary : Colors.textMuted} size={24} />
-          <View style={styles.daemonTextContainer}>
-            <Text style={styles.toolName}>Telegram Bot</Text>
-            <Text style={styles.toolDesc}>Kontrol server via Telegram</Text>
+      {/* Daemon Services */}
+      <Text style={styles.sectionTitle}>// DAEMONS</Text>
+      {['zdt-watch', 'zdt-telegram', 'zdt-api'].map((name) => (
+        <View key={name} style={styles.card}>
+          <View style={styles.cardRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              <Bot color={daemonRunning(name) ? Colors.primary : Colors.textMuted} size={22} />
+              <View>
+                <Text style={styles.toolName}>{name.toUpperCase()}</Text>
+                <Text style={styles.toolDesc}>{daemonRunning(name) ? 'Running' : 'Stopped'}</Text>
+              </View>
+            </View>
+            <Switch
+              value={daemonRunning(name)}
+              onValueChange={() => handleToggleDaemon(name)}
+              trackColor={{ false: Colors.border, true: Colors.primary + '80' }}
+              thumbColor={daemonRunning(name) ? Colors.primary : Colors.textMuted}
+            />
           </View>
         </View>
-        <Switch 
-          value={daemons.telegram} 
-          onValueChange={() => toggleDaemon('telegram')}
-          trackColor={{ false: Colors.border, true: Colors.primary + '80' }}
-          thumbColor={daemons.telegram ? Colors.primary : Colors.textMuted}
-        />
-      </View>
+      ))}
 
-      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>// PEMROSES MEDIA</Text>
-      
-      <TouchableOpacity style={styles.toolCard} onPress={() => runTool('clean')} disabled={loading}>
-        <View style={styles.toolIcon}>
-          <Wand2 color={Colors.primary} size={24} />
+      {/* Tools */}
+      <Text style={styles.sectionTitle}>// MEDIA TOOLS</Text>
+      <TouchableOpacity style={styles.card} onPress={() => handleTool('clean')} disabled={loading}>
+        <View style={styles.cardRow}>
+          <Wand2 color={Colors.primary} size={22} />
+          <View style={{ marginLeft: 12, flex: 1 }}>
+            <Text style={styles.toolName}>Clean Filenames</Text>
+            <Text style={styles.toolDesc}>Remove metadata text from filenames</Text>
+          </View>
         </View>
-        <View style={styles.toolInfo}>
-          <Text style={styles.toolName}>Bersihkan Nama File</Text>
-          <Text style={styles.toolDesc}>Hapus teks metadata yang tidak perlu</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.card} onPress={() => handleTool('sync_lyrics')} disabled={loading}>
+        <View style={styles.cardRow}>
+          <Mic2 color={Colors.secondary} size={22} />
+          <View style={{ marginLeft: 12, flex: 1 }}>
+            <Text style={styles.toolName}>Sync Lyrics</Text>
+            <Text style={styles.toolDesc}>Download .lrc lyrics automatically</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.card} onPress={() => handleTool('playlist')} disabled={loading}>
+        <View style={styles.cardRow}>
+          <ListMusic color={Colors.accent} size={22} />
+          <View style={{ marginLeft: 12, flex: 1 }}>
+            <Text style={styles.toolName}>Create Playlist</Text>
+            <Text style={styles.toolDesc}>Generate M3U from storage</Text>
+          </View>
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.toolCard} onPress={() => runTool('sync_lyrics')} disabled={loading}>
-        <View style={styles.toolIcon}>
-          <Mic2 color={Colors.secondary} size={24} />
-        </View>
-        <View style={styles.toolInfo}>
-          <Text style={styles.toolName}>Sinkronisasi Lirik</Text>
-          <Text style={styles.toolDesc}>Unduh lirik lagu secara otomatis (.lrc)</Text>
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.toolCard} onPress={() => runTool('playlist')} disabled={loading}>
-        <View style={styles.toolIcon}>
-          <ListMusic color={Colors.accent} size={24} />
-        </View>
-        <View style={styles.toolInfo}>
-          <Text style={styles.toolName}>Buat Playlist</Text>
-          <Text style={styles.toolDesc}>Buat file M3U dari penyimpanan</Text>
+      {/* Danger Zone */}
+      <Text style={styles.sectionTitle}>// DANGER ZONE</Text>
+      <TouchableOpacity style={[styles.card, styles.dangerCard]} onPress={confirmDelete} disabled={loading}>
+        <View style={styles.cardRow}>
+          <Trash2 color={Colors.error} size={22} />
+          <View style={{ marginLeft: 12, flex: 1 }}>
+            <Text style={[styles.toolName, { color: Colors.error }]}>Format Storage</Text>
+            <Text style={[styles.toolDesc, { color: Colors.error }]}>Delete all media files on server</Text>
+          </View>
         </View>
       </TouchableOpacity>
 
-      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>// ZONA BERBAHAYA</Text>
-
-      <TouchableOpacity style={[styles.toolCard, styles.dangerCard]} onPress={confirmDelete} disabled={loading}>
-        <View style={styles.toolIcon}>
-          <Trash2 color={Colors.error} size={24} />
-        </View>
-        <View style={styles.toolInfo}>
-          <Text style={[styles.toolName, { color: Colors.error }]}>Format Penyimpanan</Text>
-          <Text style={[styles.toolDesc, { color: Colors.error }]}>Hapus semua file media di server</Text>
-        </View>
-      </TouchableOpacity>
-      
       {loading && <ActivityIndicator color={Colors.primary} size="large" style={{ marginTop: 20 }} />}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    padding: 15,
-  },
+  container: { flex: 1, backgroundColor: Colors.background, padding: 15 },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.primary,
-    paddingBottom: 10,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 15, borderBottomWidth: 1, borderBottomColor: Colors.primary, paddingBottom: 10,
   },
-  title: {
-    color: Colors.text,
-    fontSize: 20,
-    fontFamily: 'monospace',
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
+  title: { color: Colors.text, fontSize: 20, fontFamily: 'monospace', fontWeight: 'bold', letterSpacing: 1 },
   statusBox: {
-    backgroundColor: '#05050A',
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.primary,
-    padding: 15,
-    marginBottom: 20,
+    backgroundColor: '#05050A', borderLeftWidth: 3, borderLeftColor: Colors.primary,
+    padding: 12, marginBottom: 15,
   },
-  statusText: {
-    color: Colors.primary,
-    fontFamily: 'monospace',
-    fontSize: 12,
-  },
+  statusText: { color: Colors.primary, fontFamily: 'monospace', fontSize: 12 },
   sectionTitle: {
-    color: Colors.textMuted,
-    fontFamily: 'monospace',
-    fontSize: 12,
-    marginBottom: 10,
-    marginTop: 10,
+    color: Colors.textMuted, fontFamily: 'monospace', fontSize: 11,
+    marginBottom: 8, marginTop: 16, letterSpacing: 1,
   },
-  daemonCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
+  card: {
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
+    padding: 14, borderRadius: 8, marginBottom: 8,
   },
-  daemonInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+  dangerCard: { borderColor: Colors.error, backgroundColor: 'rgba(255, 42, 42, 0.05)' },
+  cardRow: { flexDirection: 'row', alignItems: 'center' },
+  toolName: { color: Colors.text, fontFamily: 'monospace', fontSize: 14, fontWeight: 'bold' },
+  toolDesc: { color: Colors.textMuted, fontFamily: 'monospace', fontSize: 11, marginTop: 2 },
+  smallBtn: {
+    padding: 8, borderWidth: 1, borderColor: Colors.border,
+    borderRadius: 6, backgroundColor: Colors.background,
   },
-  daemonTextContainer: {
-    marginLeft: 15,
-  },
-  toolCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  dangerCard: {
-    borderColor: Colors.error,
-    backgroundColor: 'rgba(255, 42, 42, 0.05)',
-  },
-  toolIcon: {
-    marginRight: 15,
-  },
-  toolInfo: {
-    flex: 1,
-  },
-  toolName: {
-    color: Colors.text,
-    fontFamily: 'monospace',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  toolDesc: {
-    color: Colors.textMuted,
-    fontFamily: 'monospace',
-    fontSize: 12,
-    marginTop: 4,
-  }
 });

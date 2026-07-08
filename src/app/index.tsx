@@ -1,43 +1,48 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Colors } from '@/constants/Colors';
-import { apiClient } from '@/api/client';
-import { HardDrive, Activity, Wifi, CheckCircle2 } from 'lucide-react-native';
+import { getServerInfo, getDashboardStats, getVpnStatus } from '@/api/client';
+import { useServerStore } from '@/store/serverStore';
+import { HardDrive, Activity, Wifi, CheckCircle2, Server } from 'lucide-react-native';
+import type { ServerInfoResponse, DashboardStats } from '@/types/api';
 
 export default function DashboardScreen() {
-  const [statusData, setStatusData] = useState<any>(null);
-  const [statsData, setStatsData] = useState<any>(null);
+  const { connected, info, stats, vpnStatus, setInfo, setStats, setVpnStatus, setConnected } = useServerStore();
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setError('');
-      const [statusRes, statsRes] = await Promise.all([
-        apiClient.get('/status'),
-        apiClient.get('/stats')
+      const [serverInfo] = await Promise.all([
+        getServerInfo(),
+        getDashboardStats().catch(() => null),
+        getVpnStatus().catch(() => null),
       ]);
-      setStatusData(statusRes.data);
-      setStatsData(statsRes.data);
+      if (serverInfo) setConnected(true);
     } catch (err: any) {
-      setError(err.message || 'Connection lost');
+      setError(err?.message || 'Connection lost');
+      setConnected(false);
     }
-  };
+  }, [setConnected]);
 
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchData();
     setRefreshing(false);
-  };
+  }, [fetchData]);
 
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchData]);
+
+  const svcStatus = (active: boolean | undefined | null) =>
+    active ? 'ACTIVE' : 'OFFLINE';
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 100 }}
       refreshControl={
@@ -46,12 +51,12 @@ export default function DashboardScreen() {
     >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Dashboard</Text>
-        <Wifi color={error ? Colors.error : Colors.primary} size={24} />
+        <Wifi color={connected ? Colors.primary : Colors.error} size={24} />
       </View>
 
       {error ? (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>[!] SERVER OFFLINE: {error}</Text>
+          <Text style={styles.errorText}>[!] {error}</Text>
         </View>
       ) : null}
 
@@ -61,7 +66,7 @@ export default function DashboardScreen() {
             <Activity color={Colors.primary} size={20} />
             <Text style={styles.cardTitle}>Downloads</Text>
           </View>
-          <Text style={styles.cardValue}>{statsData?.total_count || '0'}</Text>
+          <Text style={styles.cardValue}>{stats?.total_downloads ?? info?.file_count ?? '0'}</Text>
         </View>
 
         <View style={styles.card}>
@@ -69,7 +74,7 @@ export default function DashboardScreen() {
             <CheckCircle2 color={Colors.secondary} size={20} />
             <Text style={styles.cardTitle}>Total Files</Text>
           </View>
-          <Text style={styles.cardValue}>{statusData?.file_count || '0'}</Text>
+          <Text style={styles.cardValue}>{info?.file_count || '0'}</Text>
         </View>
 
         <View style={[styles.card, { width: '100%' }]}>
@@ -77,19 +82,41 @@ export default function DashboardScreen() {
             <HardDrive color={Colors.accent} size={20} />
             <Text style={styles.cardTitle}>Storage Free</Text>
           </View>
-          <Text style={styles.cardValue}>{statusData?.storage_free || '0 GB'}</Text>
+          <Text style={styles.cardValue}>{info?.storage_free || '0 GB'}</Text>
         </View>
+
+        {vpnStatus ? (
+          <View style={[styles.card, { width: '100%' }]}>
+            <View style={styles.cardHeader}>
+              <Server color={vpnStatus.connected ? Colors.primary : Colors.textMuted} size={20} />
+              <Text style={styles.cardTitle}>VPN</Text>
+            </View>
+            <Text style={[styles.cardValue, { fontSize: 18 }]}>
+              {vpnStatus.connected ? `Connected ${vpnStatus.ip || ''}` : 'Disconnected'}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.logBox}>
         <Text style={styles.logTitle}>// ZDT Version</Text>
-        <Text style={styles.logText}>{statusData?.version || 'N/A'}</Text>
+        <Text style={styles.logText}>{info?.version || 'N/A'}</Text>
         <Text style={styles.logTitle}>// Target Directory</Text>
-        <Text style={styles.logText}>{statusData?.target_dir || 'N/A'}</Text>
+        <Text style={styles.logText}>{info?.target_dir || 'N/A'}</Text>
         <Text style={styles.logTitle}>// Watcher Daemon</Text>
-        <Text style={styles.logText}>{statusData?.watcher ? 'ACTIVE' : 'OFFLINE'}</Text>
+        <Text style={styles.logText}>{svcStatus(info?.watcher)}</Text>
         <Text style={styles.logTitle}>// Telegram Bot</Text>
-        <Text style={styles.logText}>{statusData?.telegram ? 'ACTIVE' : 'OFFLINE'}</Text>
+        <Text style={styles.logText}>{svcStatus(info?.telegram)}</Text>
+        {info?.tools ? (
+          <>
+            <Text style={styles.logTitle}>// Tools</Text>
+            {Object.entries(info.tools).map(([name, ver]) => (
+              <Text key={name} style={styles.logText}>
+                {name}: {ver}
+              </Text>
+            ))}
+          </>
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -184,5 +211,5 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     fontSize: 14,
     marginBottom: 5,
-  }
+  },
 });
