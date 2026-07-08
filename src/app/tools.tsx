@@ -6,11 +6,11 @@ import {
 import * as Sharing from 'expo-sharing';
 import { Paths, DownloadTask } from 'expo-file-system';
 import { Colors } from '@/constants/Colors';
-import { getFiles, getDownloadUrl, runTool } from '@/api/client';
+import { getFiles, getDownloadUrl, runTool, deleteFile } from '@/api/client';
 import {
   Wrench, Wand2, Mic2, ListMusic, Music4, Trash2,
   ChevronLeft, Download, FileAudio, Loader, CheckCircle,
-  XCircle, Search, ArrowRight
+  Search, ArrowRight
 } from 'lucide-react-native';
 
 type ViewMode = 'tools' | 'files' | 'progress';
@@ -157,6 +157,8 @@ export default function ToolsScreen() {
           },
         });
         const result = await task.downloadAsync();
+        // Hapus dari server setelah berhasil download
+        try { await deleteFile(name); } catch {}
         if (result && i === names.length - 1) {
           if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(result.uri);
         }
