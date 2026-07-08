@@ -1,106 +1,40 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, Switch, RefreshControl
+  ActivityIndicator, Alert
 } from 'react-native';
 import { Colors } from '@/constants/Colors';
-import {
-  getServerInfo, runTool, controlDaemon,
-  getServices, manageService, getVpnStatus,
-  vpnConnect, vpnDisconnect, vpnRestart,
-} from '@/api/client';
+import { runTool, getDownloadUrl } from '@/api/client';
 import { useServerStore } from '@/store/serverStore';
-import {
-  Terminal, Wand2, ListMusic, Mic2, Trash2, Power, Bot,
-  Server, Wifi, WifiOff, RefreshCcw, Play, StopCircle
-} from 'lucide-react-native';
-import type { ServiceInfo } from '@/types/api';
+import { Terminal, Wand2, ListMusic, Mic2, Trash2, Wifi, HardDrive, Activity } from 'lucide-react-native';
 
 export default function ToolsScreen() {
-  const { info, setInfo } = useServerStore();
+  const { info, connected } = useServerStore();
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
-  const [services, setServices] = useState<ServiceInfo[]>([]);
-  const [vpnConnected, setVpnConnected] = useState(false);
-  const [vpnIp, setVpnIp] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchAll = useCallback(async () => {
-    try {
-      const [svc, vpn] = await Promise.all([
-        getServices().catch(() => []),
-        getVpnStatus().catch(() => null),
-      ]);
-      setServices(svc);
-      if (vpn) {
-        setVpnConnected(vpn.connected);
-        setVpnIp(vpn.ip || '');
-      }
-      getServerInfo().catch(() => {});
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    fetchAll();
-    const interval = setInterval(fetchAll, 5000);
-    return () => clearInterval(interval);
-  }, [fetchAll]);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchAll();
-    setRefreshing(false);
-  };
-
-  const daemonRunning = (name: string) => {
-    const svc = services.find((s) => s.name === name);
-    return svc ? svc.status === 'running' : false;
-  };
-
-  const handleToggleDaemon = async (name: string) => {
-    const running = daemonRunning(name);
-    try {
-      await manageService(name, running ? 'stop' : 'start');
-      setStatus(`[OK] ${name.toUpperCase()} ${running ? 'STOPPED' : 'STARTED'}`);
-      fetchAll();
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
-    }
-  };
-
-  const handleTool = async (action: string, filename?: string) => {
+  const handleTool = async (action: string) => {
     setLoading(true);
-    setStatus(`EXECUTING ${action}...`);
+    setStatus(`Executing ${action}...`);
     try {
-      await runTool(action, filename);
-      setStatus(`[OK] ${action} selesai`);
+      await runTool(action);
+      setStatus(`[OK] ${action} done`);
     } catch (e: any) {
-      setStatus(`[!] ${e.message || 'FAILED'}`);
+      setStatus(`[!] ${e.message || 'Failed'}`);
     } finally {
       setLoading(false);
     }
   };
 
   const confirmDelete = () => {
-    Alert.alert('DANGER: WIPE STORAGE', 'All media files will be lost.', [
-      { text: 'CANCEL', style: 'cancel' },
-      { text: 'FORMAT', style: 'destructive', onPress: () => handleTool('delete_all') },
-    ]);
-  };
-
-  const confirmVpnRestart = () => {
-    Alert.alert('VPN Restart', 'Restart VPN connection?', [
+    Alert.alert('Format Storage', 'All media files on server will be lost.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Restart', onPress: async () => { try { await vpnRestart(); setStatus('[OK] VPN restart initiated'); fetchAll(); } catch (e: any) { Alert.alert('Error', e.message); } } },
+      { text: 'Format', style: 'destructive', onPress: () => handleTool('delete_all') },
     ]);
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 100 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
-    >
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
       <View style={styles.header}>
         <Text style={styles.title}>Tools</Text>
         <Terminal color={Colors.primary} size={24} />
@@ -112,57 +46,24 @@ export default function ToolsScreen() {
         </View>
       ) : null}
 
-      {/* VPN Section */}
-      <Text style={styles.sectionTitle}>// VPN</Text>
+      {/* Server Status */}
+      <Text style={styles.sectionTitle}>// SERVER</Text>
       <View style={styles.card}>
-        <View style={styles.cardRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            {vpnConnected ? <Wifi color={Colors.primary} size={22} /> : <WifiOff color={Colors.textMuted} size={22} />}
-            <View>
-              <Text style={styles.toolName}>{vpnConnected ? 'Connected' : 'Disconnected'}</Text>
-              {vpnIp ? <Text style={styles.toolDesc}>{vpnIp}</Text> : null}
-            </View>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {vpnConnected ? (
-              <TouchableOpacity style={styles.smallBtn} onPress={() => vpnDisconnect().then(fetchAll).catch(() => {})}>
-                <StopCircle color={Colors.error} size={18} />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.smallBtn} onPress={() => vpnConnect().then(fetchAll).catch(() => {})}>
-                <Play color={Colors.accent} size={18} />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity style={styles.smallBtn} onPress={confirmVpnRestart}>
-              <RefreshCcw color={Colors.secondary} size={18} />
-            </TouchableOpacity>
-          </View>
+        <View style={styles.row}>
+          <Wifi color={connected ? Colors.primary : Colors.textMuted} size={18} />
+          <Text style={styles.rowText}>{connected ? 'Connected' : 'Offline'}</Text>
+        </View>
+        <View style={styles.row}>
+          <HardDrive color={Colors.accent} size={18} />
+          <Text style={styles.rowText}>Storage: {info?.storage_free || 'N/A'}</Text>
+        </View>
+        <View style={styles.row}>
+          <Activity color={Colors.secondary} size={18} />
+          <Text style={styles.rowText}>Files: {info?.file_count || 0} · Version: {info?.version || 'N/A'}</Text>
         </View>
       </View>
 
-      {/* Daemon Services */}
-      <Text style={styles.sectionTitle}>// DAEMONS</Text>
-      {['zdt-watch', 'zdt-telegram', 'zdt-api'].map((name) => (
-        <View key={name} style={styles.card}>
-          <View style={styles.cardRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-              <Bot color={daemonRunning(name) ? Colors.primary : Colors.textMuted} size={22} />
-              <View>
-                <Text style={styles.toolName}>{name.toUpperCase()}</Text>
-                <Text style={styles.toolDesc}>{daemonRunning(name) ? 'Running' : 'Stopped'}</Text>
-              </View>
-            </View>
-            <Switch
-              value={daemonRunning(name)}
-              onValueChange={() => handleToggleDaemon(name)}
-              trackColor={{ false: Colors.border, true: Colors.primary + '80' }}
-              thumbColor={daemonRunning(name) ? Colors.primary : Colors.textMuted}
-            />
-          </View>
-        </View>
-      ))}
-
-      {/* Tools */}
+      {/* Media Tools */}
       <Text style={styles.sectionTitle}>// MEDIA TOOLS</Text>
       <TouchableOpacity style={styles.card} onPress={() => handleTool('clean')} disabled={loading}>
         <View style={styles.cardRow}>
@@ -192,7 +93,7 @@ export default function ToolsScreen() {
         </View>
       </TouchableOpacity>
 
-      {/* Danger Zone */}
+      {/* Danger */}
       <Text style={styles.sectionTitle}>// DANGER ZONE</Text>
       <TouchableOpacity style={[styles.card, styles.dangerCard]} onPress={confirmDelete} disabled={loading}>
         <View style={styles.cardRow}>
@@ -233,8 +134,6 @@ const styles = StyleSheet.create({
   cardRow: { flexDirection: 'row', alignItems: 'center' },
   toolName: { color: Colors.text, fontFamily: 'monospace', fontSize: 14, fontWeight: 'bold' },
   toolDesc: { color: Colors.textMuted, fontFamily: 'monospace', fontSize: 11, marginTop: 2 },
-  smallBtn: {
-    padding: 8, borderWidth: 1, borderColor: Colors.border,
-    borderRadius: 6, backgroundColor: Colors.background,
-  },
+  row: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  rowText: { color: Colors.text, fontFamily: 'monospace', fontSize: 13, marginLeft: 10 },
 });

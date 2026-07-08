@@ -1,249 +1,261 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, KeyboardAvoidingView, Platform, FlatList, Alert
+  ActivityIndicator, FlatList, Alert, Platform
 } from 'react-native';
+import { Paths, DownloadTask, File } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { Colors } from '@/constants/Colors';
-import { startDownload, getDownloads, cancelDownload, retryDownload } from '@/api/client';
-import { Download, Music, Video, Link, XCircle, RotateCw, Clock, CheckCircle, AlertCircle } from 'lucide-react-native';
-import type { DownloadItem } from '@/types/api';
+import { getFiles, getDownloadUrl, startDownload } from '@/api/client';
+import { Download, FileAudio, CheckCircle, XCircle, Clock, Loader, Search, Link } from 'lucide-react-native';
+import type { FileItem } from '@/types/api';
+
+interface DeviceDownload {
+  id: string;
+  name: string;
+  status: 'downloading' | 'completed' | 'failed';
+  progress: number;
+  fileUri?: string;
+}
 
 export default function DownloadScreen() {
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
   const [url, setUrl] = useState('');
-  const [format, setFormat] = useState<'audio' | 'video'>('audio');
-  const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState('');
-  const [queue, setQueue] = useState<DownloadItem[]>([]);
-  const [queueLoading, setQueueLoading] = useState(false);
+  const [urlLoading, setUrlLoading] = useState(false);
+  const [urlStatus, setUrlStatus] = useState('');
 
-  const fetchQueue = useCallback(async () => {
-    setQueueLoading(true);
+  // Device downloads
+  const [deviceDownloads, setDeviceDownloads] = useState<DeviceDownload[]>([]);
+
+  const fetchFiles = useCallback(async () => {
     try {
-      const res = await getDownloads(1);
-      setQueue(res.downloads || []);
-    } catch {
-      // ignore
-    } finally {
-      setQueueLoading(false);
+      const res = await getFiles('', 1, 50);
+      setFiles(res.files || []);
+    } catch {} finally {
+      setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchQueue();
-    const interval = setInterval(fetchQueue, 5000);
-    return () => clearInterval(interval);
-  }, [fetchQueue]);
+  useEffect(() => { fetchFiles(); }, [fetchFiles]);
 
-  const handleDownload = async () => {
-    if (!url) return;
-    setLoading(true);
-    setStatus('Menghubungkan ke Server...');
+  const downloadToDevice = async (file: FileItem) => {
+    const name = file.name || file.path?.split('/').pop() || 'file';
+    const id = `${Date.now()}-${name}`;
+
+    setDeviceDownloads((prev) => [...prev, { id, name, status: 'downloading', progress: 0 }]);
+
     try {
-      await startDownload(url, format);
-      setStatus('[OK] Unduhan dimulai');
-      setUrl('');
-      setTimeout(() => setStatus(''), 3000);
-      fetchQueue();
-    } catch (err: any) {
-      setStatus(`[ERROR] ${err?.message || 'Koneksi ke Server Gagal'}`);
-    } finally {
-      setLoading(false);
+      const url = getDownloadUrl(file.path || name);
+      const dest = Paths.document;
+
+      const task = new DownloadTask(url, dest, {
+        onProgress: (p) => {
+          const progress = p.totalBytes > 0
+            ? Math.round((p.bytesWritten / p.totalBytes) * 100)
+            : 0;
+          setDeviceDownloads((prev) =>
+            prev.map((d) => (d.id === id ? { ...d, progress } : d))
+          );
+        },
+      });
+
+      const result = await task.downloadAsync();
+      if (result) {
+        setDeviceDownloads((prev) =>
+          prev.map((d) => (d.id === id ? { ...d, status: 'completed', progress: 100, fileUri: result.uri } : d))
+        );
+
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(result.uri);
+        } else {
+          Alert.alert('Downloaded', `Saved to device`);
+        }
+      }
+    } catch {
+      setDeviceDownloads((prev) =>
+        prev.map((d) => (d.id === id ? { ...d, status: 'failed' } : d))
+      );
     }
   };
 
-  const handleCancel = async (id: string) => {
+  const handleUrlDownload = async () => {
+    if (!url) return;
+    setUrlLoading(true);
+    setUrlStatus('Starting server download...');
     try {
-      await cancelDownload(id);
-      fetchQueue();
-    } catch {}
+      await startDownload(url, 'audio');
+      setUrlStatus('[OK] Server download started');
+      setUrl('');
+      setTimeout(() => { setUrlStatus(''); setShowUrlInput(false); }, 2000);
+    } catch (e: any) {
+      setUrlStatus(`[!] ${e.message}`);
+    } finally {
+      setUrlLoading(false);
+    }
   };
 
-  const handleRetry = async (id: string) => {
-    try {
-      await retryDownload(id);
-      fetchQueue();
-    } catch {}
-  };
+  const filtered = searchQuery
+    ? files.filter((f) => (f.name || '').toLowerCase().includes(searchQuery.toLowerCase()))
+    : files;
 
   const statusIcon = (s: string) => {
     switch (s) {
-      case 'downloading': return <Clock color={Colors.primary} size={16} />;
+      case 'downloading': return <Loader color={Colors.primary} size={16} />;
       case 'completed': return <CheckCircle color={Colors.accent} size={16} />;
-      case 'failed': return <AlertCircle color={Colors.error} size={16} />;
-      case 'cancelled': return <XCircle color={Colors.textMuted} size={16} />;
+      case 'failed': return <XCircle color={Colors.error} size={16} />;
       default: return <Clock color={Colors.textMuted} size={16} />;
     }
   };
 
-  const renderItem = ({ item }: { item: DownloadItem }) => (
-    <View style={styles.queueItem}>
-      <View style={styles.queueItemLeft}>
-        {statusIcon(item.status)}
-        <View style={{ flex: 1, marginLeft: 10 }}>
-          <Text style={styles.queueItemTitle} numberOfLines={1}>
-            {item.title || item.url.slice(0, 50)}
-          </Text>
-          <Text style={styles.queueItemStatus}>
-            {item.status.toUpperCase()}
-            {item.progress > 0 ? ` (${item.progress}%)` : ''}
-          </Text>
-          {item.error ? (
-            <Text style={styles.queueItemError} numberOfLines={2}>{item.error}</Text>
-          ) : null}
-        </View>
-      </View>
-      <View style={styles.queueItemActions}>
-        {item.status === 'failed' ? (
-          <TouchableOpacity onPress={() => handleRetry(item.id)} style={styles.actionBtn}>
-            <RotateCw color={Colors.accent} size={18} />
-          </TouchableOpacity>
-        ) : null}
-        {item.status === 'queued' || item.status === 'downloading' ? (
-          <TouchableOpacity onPress={() => handleCancel(item.id)} style={styles.actionBtn}>
-            <XCircle color={Colors.secondary} size={18} />
-          </TouchableOpacity>
-        ) : null}
-      </View>
-    </View>
-  );
-
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Downloader</Text>
-        <Text style={styles.subtitle}>Enter media URL to extract</Text>
+        <Text style={styles.title}>Downloads</Text>
+        <Download color={Colors.primary} size={24} />
       </View>
 
-      <View style={styles.inputContainer}>
-        <Link color={Colors.primary} size={20} style={{ marginLeft: 15 }} />
-        <TextInput
-          style={styles.input}
-          placeholder="https://youtube.com/... or spotify.com/..."
-          placeholderTextColor={Colors.textMuted}
-          value={url}
-          onChangeText={setUrl}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
-
-      <View style={styles.formatSelector}>
+      {/* Search + URL toggle */}
+      <View style={styles.toolRow}>
+        <View style={styles.searchBox}>
+          <Search color={Colors.textMuted} size={16} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search server files..."
+            placeholderTextColor={Colors.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
         <TouchableOpacity
-          style={[styles.formatBtn, format === 'audio' && styles.formatBtnActive]}
-          onPress={() => setFormat('audio')}
+          style={[styles.toolBtn, showUrlInput && styles.toolBtnActive]}
+          onPress={() => setShowUrlInput(!showUrlInput)}
         >
-          <Music color={format === 'audio' ? Colors.background : Colors.primary} size={20} />
-          <Text style={[styles.formatText, format === 'audio' && styles.formatTextActive]}>Audio</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.formatBtn, format === 'video' && styles.formatBtnActive]}
-          onPress={() => setFormat('video')}
-        >
-          <Video color={format === 'video' ? Colors.background : Colors.primary} size={20} />
-          <Text style={[styles.formatText, format === 'video' && styles.formatTextActive]}>Video</Text>
+          <Link color={showUrlInput ? Colors.background : Colors.primary} size={18} />
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={[styles.downloadBtn, (!url || loading) && styles.downloadBtnDisabled]}
-        onPress={handleDownload}
-        disabled={loading || !url}
-      >
-        {loading ? (
-          <ActivityIndicator color={Colors.background} />
-        ) : (
-          <>
-            <Download color={url ? Colors.background : Colors.textMuted} size={24} />
-            <Text style={[styles.downloadText, !url && styles.downloadTextDisabled]}>Download</Text>
-          </>
-        )}
-      </TouchableOpacity>
-
-      {status ? (
-        <View style={styles.statusTerminal}>
-          <Text style={styles.statusText}>{status}</Text>
+      {/* URL download input (server-side) */}
+      {showUrlInput ? (
+        <View style={styles.urlSection}>
+          <TextInput
+            style={styles.urlInput}
+            placeholder="YouTube / Spotify URL..."
+            placeholderTextColor={Colors.textMuted}
+            value={url}
+            onChangeText={setUrl}
+          />
+          <TouchableOpacity style={styles.urlBtn} onPress={handleUrlDownload} disabled={urlLoading || !url}>
+            {urlLoading ? <ActivityIndicator color={Colors.background} size={18} /> : <Text style={styles.urlBtnText}>DL</Text>}
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      {urlStatus ? (
+        <View style={styles.urlStatus}>
+          <Text style={styles.urlStatusText}>{urlStatus}</Text>
         </View>
       ) : null}
 
-      <View style={styles.queueSection}>
-        <Text style={styles.queueSectionTitle}>Queue ({queue.length})</Text>
+      {/* Download to device section */}
+      {deviceDownloads.length > 0 ? (
+        <>
+          <Text style={styles.sectionTitle}>// TO DEVICE</Text>
+          {deviceDownloads.map((d) => (
+            <View key={d.id} style={styles.dlItem}>
+              {statusIcon(d.status)}
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.dlName} numberOfLines={1}>{d.name}</Text>
+                <Text style={styles.dlStatus}>
+                  {d.status === 'downloading' ? `${d.progress}%` : d.status.toUpperCase()}
+                </Text>
+                {d.status === 'downloading' ? (
+                  <View style={styles.progressBar}>
+                    <View style={[styles.progressFill, { width: `${d.progress}%` }]} />
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          ))}
+        </>
+      ) : null}
+
+      {/* Server files to pick */}
+      <Text style={styles.sectionTitle}>// SERVER FILES</Text>
+      {loading ? (
+        <ActivityIndicator color={Colors.primary} style={{ marginTop: 30 }} />
+      ) : (
         <FlatList
-          data={queue.filter((d) => d.status !== 'completed')}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 20 }}
+          data={filtered}
+          keyExtractor={(item) => item.path || item.name || Math.random().toString()}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.fileCard} onPress={() => downloadToDevice(item)}>
+              <FileAudio color={Colors.textMuted} size={20} />
+              <Text style={styles.fileName} numberOfLines={1}>{item.name || item.path?.split('/').pop()}</Text>
+              <Download color={Colors.primary} size={18} />
+            </TouchableOpacity>
+          )}
+          contentContainerStyle={{ paddingBottom: 100 }}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No active downloads</Text>
+            <Text style={styles.empty}>No files found on server</Text>
           }
         />
-      </View>
-    </KeyboardAvoidingView>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background, padding: 20 },
-  header: { marginBottom: 20 },
-  title: {
-    color: Colors.primary, fontSize: 26, fontFamily: 'monospace',
-    fontWeight: '900', letterSpacing: 2,
+  container: { flex: 1, backgroundColor: Colors.background, padding: 15 },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 15, borderBottomWidth: 1, borderBottomColor: Colors.primary, paddingBottom: 10,
   },
-  subtitle: { color: Colors.textMuted, fontFamily: 'monospace', fontSize: 14, marginTop: 5 },
-  inputContainer: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface,
-    borderWidth: 1, borderColor: Colors.border, borderRadius: 8, height: 56, marginBottom: 15,
+  title: { color: Colors.text, fontSize: 20, fontFamily: 'monospace', fontWeight: 'bold', letterSpacing: 1 },
+  toolRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  searchBox: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface,
+    borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12, height: 44,
   },
-  input: {
-    flex: 1, color: Colors.text, fontFamily: 'monospace', fontSize: 13,
-    marginLeft: 12, height: '100%',
+  searchInput: { flex: 1, color: Colors.text, fontFamily: 'monospace', fontSize: 13, marginLeft: 8, height: '100%' },
+  toolBtn: {
+    width: 44, height: 44, borderRadius: 8, borderWidth: 1, borderColor: Colors.primary,
+    justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface,
   },
-  formatSelector: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  formatBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
-    padding: 14, borderRadius: 8, marginHorizontal: 4,
+  toolBtnActive: { backgroundColor: Colors.primary },
+  urlSection: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  urlInput: {
+    flex: 1, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.accent,
+    borderRadius: 8, paddingHorizontal: 14, color: Colors.text, fontFamily: 'monospace', fontSize: 13, height: 44,
   },
-  formatBtnActive: {
-    backgroundColor: Colors.primary, borderColor: Colors.primary,
+  urlBtn: {
+    width: 50, height: 44, borderRadius: 8, backgroundColor: Colors.accent,
+    justifyContent: 'center', alignItems: 'center',
   },
-  formatText: { color: Colors.primary, fontFamily: 'monospace', fontWeight: 'bold', marginLeft: 8 },
-  formatTextActive: { color: Colors.background },
-  downloadBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: Colors.primary, height: 56, borderRadius: 8,
-  },
-  downloadBtnDisabled: { backgroundColor: Colors.surfaceHighlight },
-  downloadText: {
-    color: Colors.background, fontFamily: 'monospace', fontWeight: '900',
-    fontSize: 18, letterSpacing: 4, marginLeft: 10,
-  },
-  downloadTextDisabled: { color: Colors.textMuted },
-  statusTerminal: {
-    marginTop: 15, backgroundColor: '#05050A', padding: 12,
+  urlBtnText: { color: Colors.background, fontWeight: 'bold', fontFamily: 'monospace' },
+  urlStatus: {
+    backgroundColor: '#05050A', padding: 10, borderRadius: 6, marginBottom: 12,
     borderLeftWidth: 3, borderLeftColor: Colors.secondary,
   },
-  statusText: { color: Colors.secondary, fontFamily: 'monospace', fontSize: 12 },
-
-  queueSection: { flex: 1, marginTop: 20 },
-  queueSectionTitle: {
-    color: Colors.primary, fontFamily: 'monospace', fontSize: 14,
-    fontWeight: 'bold', marginBottom: 10, borderBottomWidth: 1,
-    borderBottomColor: Colors.border, paddingBottom: 8,
+  urlStatusText: { color: Colors.secondary, fontFamily: 'monospace', fontSize: 11 },
+  sectionTitle: {
+    color: Colors.textMuted, fontFamily: 'monospace', fontSize: 11,
+    marginBottom: 8, marginTop: 12, letterSpacing: 1,
   },
-  queueItem: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: Colors.surface, padding: 12, borderRadius: 6,
-    marginBottom: 6, borderWidth: 1, borderColor: Colors.border,
+  dlItem: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface,
+    padding: 12, borderRadius: 6, marginBottom: 6, borderWidth: 1, borderColor: Colors.border,
   },
-  queueItemLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  queueItemTitle: { color: Colors.text, fontFamily: 'monospace', fontSize: 12 },
-  queueItemStatus: { color: Colors.textMuted, fontFamily: 'monospace', fontSize: 11, marginTop: 2 },
-  queueItemError: { color: Colors.error, fontFamily: 'monospace', fontSize: 10, marginTop: 2 },
-  queueItemActions: { flexDirection: 'row', gap: 8 },
-  actionBtn: { padding: 6 },
-  emptyText: { color: Colors.textMuted, fontFamily: 'monospace', fontSize: 12, textAlign: 'center', marginTop: 20 },
+  dlName: { color: Colors.text, fontFamily: 'monospace', fontSize: 12 },
+  dlStatus: { color: Colors.textMuted, fontFamily: 'monospace', fontSize: 10, marginTop: 2 },
+  progressBar: { height: 3, backgroundColor: Colors.border, borderRadius: 2, marginTop: 4 },
+  progressFill: { height: 3, backgroundColor: Colors.primary, borderRadius: 2 },
+  fileCard: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface,
+    padding: 14, borderRadius: 8, marginBottom: 6, borderWidth: 1, borderColor: Colors.border,
+    gap: 12,
+  },
+  fileName: { flex: 1, color: Colors.text, fontFamily: 'monospace', fontSize: 13 },
+  empty: { color: Colors.textMuted, fontFamily: 'monospace', textAlign: 'center', marginTop: 30 },
 });
