@@ -1,84 +1,69 @@
 import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/Colors';
-import { Server, DownloadCloud, FileAudio, Settings, Terminal } from 'lucide-react-native';
+import { LayoutDashboard, BarChart3, Download, Music, Wrench } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  
+
   return (
     <>
       <StatusBar style="light" />
       <Tabs
         screenOptions={{
-          headerStyle: {
-            backgroundColor: Colors.surface,
-            borderBottomWidth: 1,
-            borderBottomColor: Colors.primary,
-            shadowColor: Colors.primary,
-            shadowOpacity: 0.3,
-            shadowRadius: 10,
-            elevation: 10,
-          },
-          headerTintColor: Colors.primary,
-          headerTitleStyle: {
-            fontWeight: 'bold',
-            fontFamily: 'monospace',
-            textTransform: 'uppercase',
-          },
+          headerShown: false,
           tabBarStyle: {
-            backgroundColor: Colors.surface,
+            backgroundColor: '#100e0c',
             borderTopWidth: 1,
-            borderTopColor: Colors.primary,
-            paddingTop: 5,
-            paddingBottom: Math.max(insets.bottom, 5),
-            height: 60 + Math.max(insets.bottom, 0),
+            borderTopColor: 'rgba(168,162,158,0.1)',
+            paddingTop: 6,
+            paddingBottom: Math.max(insets.bottom, 6),
+            height: 58 + Math.max(insets.bottom, 0),
           },
-          tabBarActiveTintColor: Colors.primary,
-          tabBarInactiveTintColor: Colors.textMuted,
-          sceneStyle: { backgroundColor: Colors.background },
-        }}>
+          tabBarActiveTintColor: '#d97706',
+          tabBarInactiveTintColor: '#78716c',
+          tabBarLabelStyle: {
+            fontFamily: 'monospace',
+            fontSize: 10,
+            marginTop: 2,
+          },
+          sceneStyle: { backgroundColor: '#0c0a09' },
+        }}
+      >
         <Tabs.Screen
           name="index"
           options={{
             title: 'Dashboard',
-            tabBarIcon: ({ color, size }) => <Server color={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <LayoutDashboard color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="statistics"
+          options={{
+            title: 'Statistics',
+            tabBarIcon: ({ color, size }) => <BarChart3 color={color} size={size} />,
           }}
         />
         <Tabs.Screen
           name="download"
           options={{
-            title: 'Download',
-            tabBarIcon: ({ color, size }) => <DownloadCloud color={color} size={size} />,
+            title: 'Downloads',
+            tabBarIcon: ({ color, size }) => <Download color={color} size={size} />,
           }}
         />
         <Tabs.Screen
-          name="explore"
+          name="spotify"
           options={{
-            title: 'Files',
-            tabBarIcon: ({ color, size }) => <FileAudio color={color} size={size} />,
-          }}
-        />
-        <Tabs.Screen
-          name="console"
-          options={{
-            title: 'Console',
-            tabBarIcon: ({ color, size }) => <Terminal color={color} size={size} />,
+            title: 'Spotify',
+            tabBarIcon: ({ color, size }) => <Music color={color} size={size} />,
           }}
         />
         <Tabs.Screen
           name="tools"
           options={{
             title: 'Tools',
-            tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
-          }}
-        />
-        <Tabs.Screen
-          name="settings"
-          options={{
-            title: 'Server',
-            tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
+            tabBarIcon: ({ color, size }) => <Wrench color={color} size={size} />,
           }}
         />
       </Tabs>

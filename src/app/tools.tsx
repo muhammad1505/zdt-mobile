@@ -1,24 +1,20 @@
 import { useState } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { runTool } from '@/api/client';
-import { useServerStore } from '@/store/serverStore';
-import { Terminal, Wand2, ListMusic, Mic2, Trash2, Wifi, HardDrive, Activity } from 'lucide-react-native';
+import { Wrench, Wand2, Mic2, ListMusic, Music4, Trash2 } from 'lucide-react-native';
 
 export default function ToolsScreen() {
-  const { info, connected } = useServerStore();
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
 
-  const handleTool = async (action: string) => {
+  const handle = async (action: string, msg?: string) => {
     setLoading(true);
-    setStatus(`Executing ${action}...`);
+    setStatus(`Running ${action}...`);
     try {
       await runTool(action);
-      setStatus(`[OK] ${action} done`);
+      setStatus(`[OK] ${msg || action}`);
+      setTimeout(() => setStatus(''), 2000);
     } catch (e: any) {
       setStatus(`[!] ${e.message || 'Failed'}`);
     } finally {
@@ -27,113 +23,73 @@ export default function ToolsScreen() {
   };
 
   const confirmDelete = () => {
-    Alert.alert('Format Storage', 'All media files on server will be lost.', [
+    Alert.alert('Format Storage', 'All media files on server will be permanently deleted.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Format', style: 'destructive', onPress: () => handleTool('delete_all') },
+      { text: 'Format', style: 'destructive', onPress: () => handle('delete_all', 'Storage formatted') },
     ]);
   };
 
+  const ToolBtn = ({ icon, label, desc, onPress, danger }: any) => (
+    <TouchableOpacity style={[s.btn, danger && s.danger]} onPress={onPress} disabled={loading}>
+      {icon}
+      <View style={{ flex: 1, marginLeft: 14 }}>
+        <Text style={[s.btnLabel, danger && { color: Colors.danger }]}>{label}</Text>
+        <Text style={[s.btnDesc, danger && { color: Colors.danger }]}>{desc}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Tools</Text>
-        <Terminal color={Colors.primary} size={24} />
+    <View style={s.container}>
+      <View style={s.header}>
+        <Text style={s.title}>Tools</Text>
+        <Wrench color={Colors.primary} size={22} />
       </View>
 
-      {status ? (
-        <View style={styles.statusBox}>
-          <Text style={styles.statusText}>{status}</Text>
-        </View>
-      ) : null}
-
-      {/* Server Status */}
-      <Text style={styles.sectionTitle}>// SERVER</Text>
-      <View style={styles.card}>
-        <View style={styles.row}>
-          <Wifi color={connected ? Colors.primary : Colors.textMuted} size={18} />
-          <Text style={styles.rowText}>{connected ? 'Connected' : 'Offline'}</Text>
-        </View>
-        <View style={styles.row}>
-          <HardDrive color={Colors.accent} size={18} />
-          <Text style={styles.rowText}>Storage: {info?.storage_free || 'N/A'}</Text>
-        </View>
-        <View style={styles.row}>
-          <Activity color={Colors.secondary} size={18} />
-          <Text style={styles.rowText}>Files: {info?.file_count || 0} · Version: {info?.version || 'N/A'}</Text>
-        </View>
-      </View>
-
-      {/* Media Tools */}
-      <Text style={styles.sectionTitle}>// MEDIA TOOLS</Text>
-      <TouchableOpacity style={styles.card} onPress={() => handleTool('clean')} disabled={loading}>
-        <View style={styles.cardRow}>
-          <Wand2 color={Colors.primary} size={22} />
-          <View style={{ marginLeft: 12, flex: 1 }}>
-            <Text style={styles.toolName}>Clean Filenames</Text>
-            <Text style={styles.toolDesc}>Remove metadata text from filenames</Text>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
+        {status ? (
+          <View style={s.statusBox}>
+            <Text style={s.statusText}>{status}</Text>
           </View>
-        </View>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.card} onPress={() => handleTool('sync_lyrics')} disabled={loading}>
-        <View style={styles.cardRow}>
-          <Mic2 color={Colors.secondary} size={22} />
-          <View style={{ marginLeft: 12, flex: 1 }}>
-            <Text style={styles.toolName}>Sync Lyrics</Text>
-            <Text style={styles.toolDesc}>Download .lrc lyrics automatically</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.card} onPress={() => handleTool('playlist')} disabled={loading}>
-        <View style={styles.cardRow}>
-          <ListMusic color={Colors.accent} size={22} />
-          <View style={{ marginLeft: 12, flex: 1 }}>
-            <Text style={styles.toolName}>Create Playlist</Text>
-            <Text style={styles.toolDesc}>Generate M3U from storage</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
+        ) : null}
 
-      {/* Danger */}
-      <Text style={styles.sectionTitle}>// DANGER ZONE</Text>
-      <TouchableOpacity style={[styles.card, styles.dangerCard]} onPress={confirmDelete} disabled={loading}>
-        <View style={styles.cardRow}>
-          <Trash2 color={Colors.error} size={22} />
-          <View style={{ marginLeft: 12, flex: 1 }}>
-            <Text style={[styles.toolName, { color: Colors.error }]}>Format Storage</Text>
-            <Text style={[styles.toolDesc, { color: Colors.error }]}>Delete all media files on server</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
+        <Text style={s.sectionTitle}>// MEDIA</Text>
+        <ToolBtn icon={<Wand2 color={Colors.primary} size={20} />} label="Clean Filenames" desc="Remove metadata text from filenames" onPress={() => handle('clean', 'Filenames cleaned')} />
+        <ToolBtn icon={<Mic2 color={Colors.secondary} size={20} />} label="Sync Lyrics" desc="Download .lrc lyrics for all files" onPress={() => handle('sync_lyrics', 'Lyrics synced')} />
+        <ToolBtn icon={<ListMusic color={Colors.accent} size={20} />} label="Create Playlist" desc="Generate M3U playlist from storage" onPress={() => handle('playlist', 'Playlist created')} />
 
-      {loading && <ActivityIndicator color={Colors.primary} size="large" style={{ marginTop: 20 }} />}
-    </ScrollView>
+        <Text style={s.sectionTitle}>// ADVANCED</Text>
+        <ToolBtn icon={<Music4 color="#f59e0b" size={20} />} label="Demucs" desc="AI vocal separation" onPress={() => handle('demucs', 'Demucs processing started')} />
+        <ToolBtn icon={<Trash2 color={Colors.danger} size={20} />} label="Format Storage" desc="Delete all media files on server" danger onPress={confirmDelete} />
+
+        {loading && <ActivityIndicator color={Colors.primary} style={{ marginTop: 20 }} />}
+      </ScrollView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background, padding: 15 },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 15, borderBottomWidth: 1, borderBottomColor: Colors.primary, paddingBottom: 10,
+    paddingHorizontal: 20, paddingTop: 60, paddingBottom: 16,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  title: { color: Colors.text, fontSize: 20, fontFamily: 'monospace', fontWeight: 'bold', letterSpacing: 1 },
+  title: { color: Colors.text, fontSize: 20, fontFamily: 'monospace', fontWeight: '700', letterSpacing: 1 },
   statusBox: {
-    backgroundColor: '#05050A', borderLeftWidth: 3, borderLeftColor: Colors.primary,
-    padding: 12, marginBottom: 15,
+    backgroundColor: Colors.card, borderRadius: 8, padding: 14, marginBottom: 16,
+    borderLeftWidth: 3, borderLeftColor: Colors.primary,
   },
   statusText: { color: Colors.primary, fontFamily: 'monospace', fontSize: 12 },
   sectionTitle: {
-    color: Colors.textMuted, fontFamily: 'monospace', fontSize: 11,
-    marginBottom: 8, marginTop: 16, letterSpacing: 1,
+    color: Colors.textMuted, fontFamily: 'monospace', fontSize: 10, letterSpacing: 1.5,
+    marginBottom: 10, marginTop: 20,
   },
-  card: {
-    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
-    padding: 14, borderRadius: 8, marginBottom: 8,
+  btn: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface,
+    padding: 16, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, marginBottom: 10,
   },
-  dangerCard: { borderColor: Colors.error, backgroundColor: 'rgba(255, 42, 42, 0.05)' },
-  cardRow: { flexDirection: 'row', alignItems: 'center' },
-  toolName: { color: Colors.text, fontFamily: 'monospace', fontSize: 14, fontWeight: 'bold' },
-  toolDesc: { color: Colors.textMuted, fontFamily: 'monospace', fontSize: 11, marginTop: 2 },
-  row: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  rowText: { color: Colors.text, fontFamily: 'monospace', fontSize: 13, marginLeft: 10 },
+  danger: { borderColor: Colors.danger, backgroundColor: 'rgba(220,38,38,0.05)' },
+  btnLabel: { color: Colors.text, fontFamily: 'monospace', fontSize: 14, fontWeight: '600' },
+  btnDesc: { color: Colors.textMuted, fontFamily: 'monospace', fontSize: 11, marginTop: 2 },
 });

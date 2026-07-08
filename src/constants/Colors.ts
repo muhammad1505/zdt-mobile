@@ -1,12 +1,18 @@
 export const Colors = {
-  background: '#09090E',     // Deep dark blue/black
-  surface: '#13131A',        // Card background
-  surfaceHighlight: '#1F1F2C', // Card hover/active
-  text: '#E0E0FF',           // Off-white/cyan-tint text
-  textMuted: '#6B6B80',      // Muted text
-  primary: '#00F0FF',        // Neon Cyan
-  secondary: '#FF003C',      // Neon Magenta
-  accent: '#FCE205',         // Electric Yellow
-  border: '#2A2A3C',         // Card borders
-  error: '#FF2A2A',          // Error Red
+  background: '#0c0a09',
+  surface: '#141211',
+  card: '#1c1917',
+  elevated: '#292524',
+  text: '#fef3c7',
+  textMuted: '#78716c',
+  textDim: '#a8a29e',
+  primary: '#d97706',
+  primaryHover: '#f59e0b',
+  secondary: '#06b6d4',
+  accent: '#16a34a',
+  danger: '#dc2626',
+  warning: '#f59e0b',
+  border: 'rgba(168,162,158,0.06)',
+  borderLight: 'rgba(168,162,158,0.10)',
+  log: '#a3be8c',
 };

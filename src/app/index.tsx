@@ -1,215 +1,247 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { Colors } from '@/constants/Colors';
-import { getServerInfo, getDashboardStats, getVpnStatus } from '@/api/client';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  RefreshControl, Modal, TextInput, Alert
+} from 'react-native';
+import { getItemAsync, setItemAsync } from '@/utils/storage';
+import { getServerInfo, getDashboardStats } from '@/api/client';
 import { useServerStore } from '@/store/serverStore';
-import { HardDrive, Activity, Wifi, CheckCircle2, Server } from 'lucide-react-native';
-import type { ServerInfoResponse, DashboardStats } from '@/types/api';
+import {
+  Wifi, HardDrive, Bot, FileAudio, Download, BarChart3, Music, Wrench,
+  Settings as Gear, X, Key, Folder
+} from 'lucide-react-native';
 
 export default function DashboardScreen() {
-  const { connected, info, stats, vpnStatus, setInfo, setStats, setVpnStatus, setConnected } = useServerStore();
+  const { connected, info, stats, setConnected, setInfo, setStats } = useServerStore();
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [dlDir, setDlDir] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
-      setError('');
-      const [serverInfo] = await Promise.all([
+      const [si] = await Promise.all([
         getServerInfo(),
         getDashboardStats().catch(() => null),
-        getVpnStatus().catch(() => null),
       ]);
-      if (serverInfo) setConnected(true);
-    } catch (err: any) {
-      setError(err?.message || 'Connection lost');
+      if (si) setConnected(true);
+    } catch {
       setConnected(false);
     }
   }, [setConnected]);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchData();
-    setRefreshing(false);
-  }, [fetchData]);
-
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  const svcStatus = (active: boolean | undefined | null) =>
-    active ? 'ACTIVE' : 'OFFLINE';
+  useEffect(() => {
+    getItemAsync('zdt_api_key').then((v) => setApiKey(v || '')).catch(() => {});
+    getItemAsync('zdt_dl_dir').then((v) => setDlDir(v || '')).catch(() => {});
+  }, [settingsOpen]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  };
+
+  const saveSettings = async () => {
+    await setItemAsync('zdt_api_key', apiKey);
+    await setItemAsync('zdt_dl_dir', dlDir);
+    setSettingsOpen(false);
+    Alert.alert('Saved', 'Settings saved. Restart to apply API key.');
+  };
+
+  const StatCard = ({ icon, label, value, color }: any) => (
+    <View style={styles.statCard}>
+      <View style={styles.statHeader}>
+        {icon}
+        <Text style={styles.statLabel}>{label}</Text>
+      </View>
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
+    </View>
+  );
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 100 }}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
-      }
-    >
+    <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Dashboard</Text>
-        <Wifi color={connected ? Colors.primary : Colors.error} size={24} />
+        <View>
+          <Text style={styles.logo}>ZDT</Text>
+          <Text style={styles.subtitle}>Console</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <View style={[styles.statusDot, { backgroundColor: connected ? '#16a34a' : '#dc2626' }]} />
+          <TouchableOpacity onPress={() => setSettingsOpen(true)}>
+            <Gear color="#a8a29e" size={20} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {error ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>[!] {error}</Text>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#d97706" />}
+      >
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          <StatCard
+            icon={<HardDrive color="#d97706" size={18} />}
+            label="Storage"
+            value={info?.storage_free || '...'}
+            color="#d97706"
+          />
+          <StatCard
+            icon={<Bot color="#06b6d4" size={18} />}
+            label="Watcher"
+            value={info?.watcher ? 'Active' : 'Off'}
+            color="#06b6d4"
+          />
+          <StatCard
+            icon={<FileAudio color="#16a34a" size={18} />}
+            label="Files"
+            value={info?.file_count ?? '...'}
+            color="#16a34a"
+          />
+          <StatCard
+            icon={<Wifi color="#f59e0b" size={18} />}
+            label="Telegram"
+            value={info?.telegram ? 'Active' : 'Off'}
+            color="#f59e0b"
+          />
         </View>
-      ) : null}
 
-      <View style={styles.grid}>
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Activity color={Colors.primary} size={20} />
-            <Text style={styles.cardTitle}>Downloads</Text>
-          </View>
-          <Text style={styles.cardValue}>{stats?.total_downloads ?? info?.file_count ?? '0'}</Text>
+        {/* Quick Actions */}
+        <Text style={styles.sectionTitle}>// QUICK ACTIONS</Text>
+        <View style={styles.actionsGrid}>
+          <TouchableOpacity style={styles.actionCard} onPress={() => {}}>
+            <Download color="#d97706" size={22} />
+            <Text style={styles.actionLabel}>Downloads</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionCard}>
+            <BarChart3 color="#06b6d4" size={22} />
+            <Text style={styles.actionLabel}>Stats</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionCard}>
+            <Music color="#16a34a" size={22} />
+            <Text style={styles.actionLabel}>Spotify</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionCard}>
+            <Wrench color="#f59e0b" size={22} />
+            <Text style={styles.actionLabel}>Tools</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <CheckCircle2 color={Colors.secondary} size={20} />
-            <Text style={styles.cardTitle}>Total Files</Text>
-          </View>
-          <Text style={styles.cardValue}>{info?.file_count || '0'}</Text>
+        {/* Server Info */}
+        <Text style={styles.sectionTitle}>// SERVER</Text>
+        <View style={styles.infoCard}>
+          <InfoRow label="Version" value={info?.version || 'N/A'} />
+          <InfoRow label="Target" value={info?.target_dir || 'N/A'} />
+          <InfoRow label="Storage" value={info?.storage_free || 'N/A'} />
+          <InfoRow label="Files" value={`${info?.file_count || 0}`} />
         </View>
+      </ScrollView>
 
-        <View style={[styles.card, { width: '100%' }]}>
-          <View style={styles.cardHeader}>
-            <HardDrive color={Colors.accent} size={20} />
-            <Text style={styles.cardTitle}>Storage Free</Text>
-          </View>
-          <Text style={styles.cardValue}>{info?.storage_free || '0 GB'}</Text>
-        </View>
-
-        {vpnStatus ? (
-          <View style={[styles.card, { width: '100%' }]}>
-            <View style={styles.cardHeader}>
-              <Server color={vpnStatus.connected ? Colors.primary : Colors.textMuted} size={20} />
-              <Text style={styles.cardTitle}>VPN</Text>
+      {/* Settings Modal */}
+      <Modal visible={settingsOpen} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Settings</Text>
+              <TouchableOpacity onPress={() => setSettingsOpen(false)}>
+                <X color="#a8a29e" size={20} />
+              </TouchableOpacity>
             </View>
-            <Text style={[styles.cardValue, { fontSize: 18 }]}>
-              {vpnStatus.connected ? `Connected ${vpnStatus.ip || ''}` : 'Disconnected'}
-            </Text>
+            <View style={styles.inputGroup}>
+              <Key color="#d97706" size={16} />
+              <TextInput
+                style={styles.input}
+                placeholder="API Key"
+                placeholderTextColor="#78716c"
+                secureTextEntry
+                value={apiKey}
+                onChangeText={setApiKey}
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Folder color="#16a34a" size={16} />
+              <TextInput
+                style={styles.input}
+                placeholder="Download dir (default: app storage)"
+                placeholderTextColor="#78716c"
+                value={dlDir}
+                onChangeText={setDlDir}
+              />
+            </View>
+            <TouchableOpacity style={styles.saveBtn} onPress={saveSettings}>
+              <Text style={styles.saveBtnText}>Save</Text>
+            </TouchableOpacity>
           </View>
-        ) : null}
-      </View>
-
-      <View style={styles.logBox}>
-        <Text style={styles.logTitle}>// ZDT Version</Text>
-        <Text style={styles.logText}>{info?.version || 'N/A'}</Text>
-        <Text style={styles.logTitle}>// Target Directory</Text>
-        <Text style={styles.logText}>{info?.target_dir || 'N/A'}</Text>
-        <Text style={styles.logTitle}>// Watcher Daemon</Text>
-        <Text style={styles.logText}>{svcStatus(info?.watcher)}</Text>
-        <Text style={styles.logTitle}>// Telegram Bot</Text>
-        <Text style={styles.logText}>{svcStatus(info?.telegram)}</Text>
-        {info?.tools ? (
-          <>
-            <Text style={styles.logTitle}>// Tools</Text>
-            {Object.entries(info.tools).map(([name, ver]) => (
-              <Text key={name} style={styles.logText}>
-                {name}: {ver}
-              </Text>
-            ))}
-          </>
-        ) : null}
-      </View>
-    </ScrollView>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
+const InfoRow = ({ label, value }: any) => (
+  <View style={styles.infoRow}>
+    <Text style={styles.infoLabel}>{label}</Text>
+    <Text style={styles.infoValue}>{value}</Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    padding: 15,
-  },
+  container: { flex: 1, backgroundColor: '#0c0a09' },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.primary,
-    paddingBottom: 10,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 60, paddingBottom: 16,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(168,162,158,0.08)',
   },
-  headerTitle: {
-    color: Colors.text,
-    fontSize: 20,
-    fontFamily: 'monospace',
-    fontWeight: 'bold',
-    letterSpacing: 1,
+  logo: { color: '#d97706', fontSize: 28, fontFamily: 'monospace', fontWeight: '900', letterSpacing: 2 },
+  subtitle: { color: '#78716c', fontFamily: 'monospace', fontSize: 11, letterSpacing: 1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 16, gap: 12 },
+  statCard: {
+    width: '46%', backgroundColor: '#141211', borderRadius: 10,
+    padding: 16, borderWidth: 1, borderColor: 'rgba(168,162,158,0.06)',
   },
-  errorBox: {
-    backgroundColor: 'rgba(255, 42, 42, 0.1)',
-    borderWidth: 1,
-    borderColor: Colors.error,
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
+  statHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  statLabel: { color: '#78716c', fontFamily: 'monospace', fontSize: 11, marginLeft: 8, letterSpacing: 0.5 },
+  statValue: { fontSize: 22, fontFamily: 'monospace', fontWeight: '700' },
+  sectionTitle: {
+    color: '#78716c', fontFamily: 'monospace', fontSize: 10, letterSpacing: 1.5,
+    paddingHorizontal: 20, marginTop: 20, marginBottom: 12,
   },
-  errorText: {
-    color: Colors.error,
-    fontFamily: 'monospace',
-    fontWeight: 'bold',
+  actionsGrid: { flexDirection: 'row', paddingHorizontal: 16, gap: 12 },
+  actionCard: {
+    flex: 1, backgroundColor: '#141211', borderRadius: 10,
+    padding: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(168,162,158,0.06)',
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 15,
+  actionLabel: { color: '#a8a29e', fontFamily: 'monospace', fontSize: 10, marginTop: 8 },
+  infoCard: {
+    marginHorizontal: 16, backgroundColor: '#141211', borderRadius: 10,
+    padding: 16, borderWidth: 1, borderColor: 'rgba(168,162,158,0.06)',
   },
-  card: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    padding: 15,
-    width: '47%',
-    shadowColor: Colors.primary,
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 3,
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(168,162,158,0.04)' },
+  infoLabel: { color: '#78716c', fontFamily: 'monospace', fontSize: 12 },
+  infoValue: { color: '#fef3c7', fontFamily: 'monospace', fontSize: 12 },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 },
+  modal: { backgroundColor: '#141211', borderRadius: 14, padding: 24, borderWidth: 1, borderColor: 'rgba(168,162,158,0.1)' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  modalTitle: { color: '#fef3c7', fontSize: 18, fontFamily: 'monospace', fontWeight: '700' },
+  inputGroup: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#1c1917',
+    borderRadius: 8, paddingHorizontal: 14, height: 48, marginBottom: 14,
+    borderWidth: 1, borderColor: 'rgba(168,162,158,0.08)',
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
+  input: { flex: 1, color: '#fef3c7', fontFamily: 'monospace', fontSize: 14, marginLeft: 10, height: '100%' },
+  saveBtn: {
+    backgroundColor: '#d97706', height: 48, borderRadius: 8,
+    justifyContent: 'center', alignItems: 'center', marginTop: 8,
   },
-  cardTitle: {
-    color: Colors.textMuted,
-    fontFamily: 'monospace',
-    fontSize: 12,
-    marginLeft: 8,
-  },
-  cardValue: {
-    color: Colors.text,
-    fontSize: 28,
-    fontWeight: 'bold',
-    fontFamily: 'monospace',
-  },
-  logBox: {
-    marginTop: 25,
-    backgroundColor: '#05050A',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 15,
-    borderRadius: 5,
-  },
-  logTitle: {
-    color: Colors.primary,
-    fontFamily: 'monospace',
-    fontSize: 12,
-    marginTop: 10,
-  },
-  logText: {
-    color: Colors.text,
-    fontFamily: 'monospace',
-    fontSize: 14,
-    marginBottom: 5,
-  },
+  saveBtnText: { color: '#0c0a09', fontWeight: '700', fontSize: 15, fontFamily: 'monospace' },
 });
